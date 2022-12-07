@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<node name="/org/jjaro/ddclight">
+    <interface name="org.jjaro.DDCLight">
+        <method name="get">
+            <arg type="x" name="percentage" direction="out" />
+        </method>
+        <method name="poke">
+            <arg type="x" name="percentage" direction="out" />
+        </method>
+        <method name="set">
+            <arg type="x" name="percentage" direction="in" />
+            <arg type="x" name="new_percentage" direction="out" />
+        </method>
+        <method name="increment">
+            <arg type="x" name="percentage" direction="in" />
+            <arg type="x" name="new_percentage" direction="out" />
+        </method>
+        <method name="decrement">
+            <arg type="x" name="percentage" direction="in" />
+            <arg type="x" name="new_percentage" direction="out" />
+        </method>
+        <signal name="watch">
+            <arg type="x" name="percentage" />
+        </signal>
+    </interface>
+</node>

@@ -1,0 +1,5 @@
+build
+ddclight
+*.o
+*-client-glue.h
+*-server-glue.h
