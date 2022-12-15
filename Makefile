@@ -6,10 +6,10 @@ format: ddclight.cc client.h server.h ddc.h ddc.cc enumerate.h enumerate.cc thre
 	clang-format -i --style=Google $^
 
 iwyu:
-	include-what-you-use -Xiwyu --no_comments -Xiwyu --no_fwd_decls -std=c++17 ddclight.cc `pkgconf --cflags $(DEPS)`
-	include-what-you-use -Xiwyu --no_comments -Xiwyu --no_fwd_decls -std=c++17 ddc.cc `pkgconf --cflags $(DEPS)`
-	include-what-you-use -Xiwyu --no_comments -Xiwyu --no_fwd_decls -std=c++17 enumerate.cc `pkgconf --cflags $(DEPS)`
-	include-what-you-use -Xiwyu --no_comments -Xiwyu --no_fwd_decls -std=c++17 thread.cc `pkgconf --cflags $(DEPS)`
+	include-what-you-use -Xiwyu --no_comments -Xiwyu --no_fwd_decls -std=c++17 ddclight.cc `pkg-config --cflags $(DEPS)`
+	include-what-you-use -Xiwyu --no_comments -Xiwyu --no_fwd_decls -std=c++17 ddc.cc `pkg-config --cflags $(DEPS)`
+	include-what-you-use -Xiwyu --no_comments -Xiwyu --no_fwd_decls -std=c++17 enumerate.cc `pkg-config --cflags $(DEPS)`
+	include-what-you-use -Xiwyu --no_comments -Xiwyu --no_fwd_decls -std=c++17 thread.cc `pkg-config --cflags $(DEPS)`
 
 %-client-glue.h: %.xml
 	sdbus-c++-xml2cpp $^ --proxy=$@
@@ -20,19 +20,19 @@ iwyu:
 	clang-format -i --style=Google $@
 
 ddclight: ddclight.o ddc.o enumerate.o thread.o
-	$(CXX) $(CXXFLAGS) -std=c++17 -o $@ $^ `pkgconf --libs $(DEPS)`
+	$(CXX) $(CXXFLAGS) -std=c++17 -o $@ $^ `pkg-config --libs $(DEPS)`
 
 ddclight.o: ddclight.cc ddclight-client-glue.h ddclight-server-glue.h
-	$(CXX) $(CXXFLAGS) -std=c++17 -c -o $@ $< `pkgconf --cflags $(DEPS)`
+	$(CXX) $(CXXFLAGS) -std=c++17 -c -o $@ $< `pkg-config --cflags $(DEPS)`
 
 ddc.o: ddc.cc
-	$(CXX) $(CXXFLAGS) -std=c++17 -c -o $@ $< `pkgconf --cflags $(DEPS)`
+	$(CXX) $(CXXFLAGS) -std=c++17 -c -o $@ $< `pkg-config --cflags $(DEPS)`
 
 enumerate.o: enumerate.cc
-	$(CXX) $(CXXFLAGS) -std=c++17 -c -o $@ $< `pkgconf --cflags $(DEPS)`
+	$(CXX) $(CXXFLAGS) -std=c++17 -c -o $@ $< `pkg-config --cflags $(DEPS)`
 
 thread.o: thread.cc
-	$(CXX) $(CXXFLAGS) -std=c++17 -c -o $@ $< `pkgconf --cflags $(DEPS)`
+	$(CXX) $(CXXFLAGS) -std=c++17 -c -o $@ $< `pkg-config --cflags $(DEPS)`
 
 clean:
 	rm -f *-client-glue.h *-server-glue.h ddclight *.o
