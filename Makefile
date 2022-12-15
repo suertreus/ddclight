@@ -42,4 +42,9 @@ install: ddclight ddclight.service ddclight.xml
 	install -D $<.service --mode=0644 --target-directory="$(DESTDIR)/usr/share/dbus-1/services"
 	install -D $<.xml --mode=0644 --target-directory="$(DESTDIR)/usr/share/dbus-1/interfaces"
 
-.PHONY: clean all format iwyu install
+homedir-install: ddclight ddclight.service ddclight.xml
+	install -D $< --target-directory="$(HOME)/bin"
+	install -D $<.service --mode=0644 --target-directory="$(or $(XDG_DATA_HOME),$(HOME)/.local/share)/dbus-1/services"
+	install -D $<.xml --mode=0644 --target-directory="$(or $(XDG_DATA_HOME),$(HOME)/.local/share)/dbus-1/interfaces"
+
+.PHONY: clean all format iwyu install homedir-install
