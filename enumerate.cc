@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <functional>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -16,7 +17,6 @@
 #include <utility>
 #include <vector>
 
-#include "absl/functional/any_invocable.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/match.h"
@@ -24,8 +24,8 @@
 
 namespace jjaro {
 namespace {
-using UniqueFile = std::unique_ptr<FILE, absl::AnyInvocable<void(FILE *)>>;
-using UniqueDir = std::unique_ptr<DIR, absl::AnyInvocable<void(DIR *)>>;
+using UniqueFile = std::unique_ptr<FILE, std::function<void(FILE *)>>;
+using UniqueDir = std::unique_ptr<DIR, std::function<void(DIR *)>>;
 UniqueFile OpenUniqueFile(const char *__restrict__ path,
                           const char *__restrict__ mode) {
   return UniqueFile(fopen(path, mode), [](FILE *fp) { fclose(fp); });

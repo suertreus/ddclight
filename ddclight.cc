@@ -7,7 +7,6 @@
 #include <string>
 #include <string_view>
 
-#include "absl/functional/any_invocable.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_format.h"
 #include "client.h"

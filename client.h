@@ -3,10 +3,10 @@
 #include <sdbus-c++/sdbus-c++.h>
 
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <utility>
 
-#include "absl/functional/any_invocable.h"
 #include "ddclight-client-glue.h"
 
 namespace jjaro {
@@ -17,7 +17,7 @@ class DDCLightProxy final
   DDCLightProxy(
       sdbus::IConnection& connection, std::string destination,
       std::string objectPath,
-      absl::AnyInvocable<void(int64_t)> watch = [](int64_t) {})
+      std::function<void(int64_t)> watch = [](int64_t) {})
       : ProxyInterfaces(connection, std::move(destination),
                         std::move(objectPath)),
         watch_(std::move(watch)) {
@@ -29,7 +29,7 @@ class DDCLightProxy final
  private:
   void onWatch(const int64_t& percentage) override { watch_(percentage); }
 
-  absl::AnyInvocable<void(int64_t)> watch_;
+  std::function<void(int64_t)> watch_;
 };
 
 }  // namespace jjaro
