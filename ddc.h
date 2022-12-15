@@ -4,12 +4,12 @@
 #include <cstdint>
 #include <optional>
 #include <string>
-#include <string_view>
 #include <utility>
 
 #include "absl/functional/function_ref.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 
 namespace jjaro {
@@ -24,16 +24,16 @@ class DDCDevice {
   absl::Status SetBrightnessPercent(
       int percent, absl::FunctionRef<bool()> cancel = [] { return false; });
   absl::StatusOr<int> cached_brightness_percent() const;
-  std::string_view devnode() const { return devnode_; }
+  absl::string_view devnode() const { return devnode_; }
 
  private:
   DDCDevice(std::string devnode, int fd)
       : devnode_(std::move(devnode)), fd_(fd) {}
   absl::Status TryWrite(absl::Span<const std::byte> buf,
-                        std::string_view error);
-  absl::Status TryRead(absl::Span<std::byte> buf, std::string_view error);
+                        absl::string_view error);
+  absl::Status TryRead(absl::Span<std::byte> buf, absl::string_view error);
   static absl::Status ValidateBrightnessResp(absl::Span<const std::byte> buf,
-                                             std::string_view error);
+                                             absl::string_view error);
 
   std::string devnode_;
   int fd_;

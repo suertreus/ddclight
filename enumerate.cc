@@ -11,7 +11,6 @@
 #include <cstring>
 #include <memory>
 #include <string>
-#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -21,6 +20,7 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
 
 namespace jjaro {
 namespace {
@@ -90,7 +90,7 @@ absl::StatusOr<std::vector<std::string>> GetDevnodes() {
     std::array<char, 6> buf;
     const size_t sret = fread(buf.data(), 1, buf.size(), fp.get());
     if (sret != buf.size()) continue;
-    if (std::string_view(buf.data(), buf.size()) != "DPMST\n") continue;
+    if (absl::string_view(buf.data(), buf.size()) != "DPMST\n") continue;
     ret.push_back(absl::StrCat("/dev/", ent->d_name));
   }
 }

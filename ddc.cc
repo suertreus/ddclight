@@ -10,12 +10,12 @@
 #include <cstddef>
 #include <cstring>
 #include <string>
-#include <string_view>
 
 #include "absl/functional/function_ref.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
 #include "absl/types/span.h"
@@ -137,7 +137,7 @@ absl::StatusOr<int> DDCDevice::cached_brightness_percent() const {
 }
 
 absl::Status DDCDevice::TryWrite(absl::Span<const std::byte> buf,
-                                 std::string_view error) {
+                                 absl::string_view error) {
   const ssize_t wret = write(fd_, buf.data(), buf.size());
   if (wret < 0)
     return absl::InternalError(
@@ -148,7 +148,7 @@ absl::Status DDCDevice::TryWrite(absl::Span<const std::byte> buf,
   return absl::OkStatus();
 }
 absl::Status DDCDevice::TryRead(absl::Span<std::byte> buf,
-                                std::string_view error) {
+                                absl::string_view error) {
   const ssize_t rret = read(fd_, buf.data(), buf.size());
   if (rret < 0)
     return absl::InternalError(
@@ -159,7 +159,7 @@ absl::Status DDCDevice::TryRead(absl::Span<std::byte> buf,
   return absl::OkStatus();
 }
 absl::Status DDCDevice::ValidateBrightnessResp(absl::Span<const std::byte> buf,
-                                               std::string_view error) {
+                                               absl::string_view error) {
   if (buf[1] != kDeviceWriteAddr)
     return absl::InternalError(absl::StrCat(
         error, " unexpected source address 0x", absl::Hex(buf[1])));
