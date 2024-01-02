@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD 17)
 find_package(absl REQUIRED)
 find_package(sdbus-c++-tools REQUIRED)
 find_package(sdbus-c++ REQUIRED)
+find_package(wayland-client REQUIRED)
 
 add_custom_command(
     OUTPUT ddclight-client-glue.h ddclight-server-glue.h
@@ -29,7 +30,7 @@ target_include_directories(
     PRIVATE   ${CMAKE_CURRENT_BINARY_DIR}
 )
 
-target_link_libraries(ddclight PRIVATE SDBusCpp::sdbus-c++ absl::str_format absl::strings absl::status absl::statusor absl::time absl::span absl::synchronization absl::core_headers absl::any_invocable absl::function_ref)
+target_link_libraries(ddclight PRIVATE SDBusCpp::sdbus-c++ absl::str_format absl::strings absl::status absl::statusor absl::time absl::span absl::synchronization absl::core_headers absl::any_invocable absl::function_ref wayland-client)
 
 install(TARGETS ddclight)
 install(FILES ddclight.service DESTINATION share/dbus-1/services)
