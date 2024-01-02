@@ -4,10 +4,11 @@ project(ddclight)
 
 set(CMAKE_CXX_STANDARD 17)
 
+find_package(PkgConfig)
 find_package(absl REQUIRED)
 find_package(sdbus-c++-tools REQUIRED)
 find_package(sdbus-c++ REQUIRED)
-find_package(wayland-client REQUIRED)
+pkg_check_modules(WAYLAND wayland-client)
 
 add_custom_command(
     OUTPUT ddclight-client-glue.h ddclight-server-glue.h
