@@ -1,5 +1,13 @@
 #include "ddc.h"
 
+#include <absl/functional/function_ref.h>
+#include <absl/status/status.h>
+#include <absl/status/statusor.h>
+#include <absl/strings/str_cat.h>
+#include <absl/strings/string_view.h>
+#include <absl/time/clock.h>
+#include <absl/time/time.h>
+#include <absl/types/span.h>
 #include <fcntl.h>
 #include <linux/i2c-dev.h>
 #include <sys/ioctl.h>
@@ -10,15 +18,6 @@
 #include <cstddef>
 #include <cstring>
 #include <string>
-
-#include "absl/functional/function_ref.h"
-#include "absl/status/status.h"
-#include "absl/status/statusor.h"
-#include "absl/strings/str_cat.h"
-#include "absl/strings/string_view.h"
-#include "absl/time/clock.h"
-#include "absl/time/time.h"
-#include "absl/types/span.h"
 
 namespace jjaro {
 namespace {
@@ -41,11 +40,13 @@ constexpr std::byte Checksum(absl::Span<const std::byte> buf) {
 }
 }  // namespace
 
-absl::StatusOr<DDCDevice> DDCDevice::Open(std::string devnode) {
-  const int fd = open(devnode.c_str(), O_RDWR);
-  if (fd == -1)
-    return absl::InternalError(
-        absl::StrCat("open ", devnode, " failed: ", strerror(errno)));
+absl::StatusOr<DDCDevice> DDCDevice::Open(std::string devnode, int fd) {
+  if (fd == -1) {
+    fd = open(devnode.c_str(), O_RDWR);
+    if (fd == -1)
+      return absl::InternalError(
+          absl::StrCat("open ", devnode, " failed: ", strerror(errno)));
+  }
   if (const int iret = ioctl(fd, I2C_SLAVE, kDeviceBusAddr); iret != 0) {
     close(fd);
     return absl::InternalError(absl::StrCat("ioctl ", devnode, " I2C_SLAVE 0x",

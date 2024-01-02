@@ -1,7 +1,7 @@
 #ifndef JJARO_STATE_H_
 #define JJARO_STATE_H_ 1
-#include "absl/base/thread_annotations.h"
-#include "absl/synchronization/mutex.h"
+#include <absl/base/thread_annotations.h>
+#include <absl/synchronization/mutex.h>
 
 namespace jjaro {
 struct State {

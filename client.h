@@ -1,12 +1,12 @@
 #ifndef JJARO_CLIENT_H_
 #define JJARO_CLIENT_H_ 1
+#include <absl/functional/any_invocable.h>
 #include <sdbus-c++/sdbus-c++.h>
 
 #include <cstdint>
 #include <string>
 #include <utility>
 
-#include "absl/functional/any_invocable.h"
 #include "ddclight-client-glue.h"
 
 namespace jjaro {

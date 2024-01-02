@@ -1,110 +1,76 @@
 #include "enumerate.h"
 
-#include <dirent.h>
-#include <sys/utsname.h>
+#include <wayland-util.h>
 
-#include <algorithm>
-#include <array>
-#include <cerrno>
+#include <absl/functional/any_invocable.h>
+#include <absl/strings/str_format.h>
+#include <absl/strings/string_view.h>
 #include <cstdio>
-#include <cstdlib>
-#include <cstring>
 #include <memory>
-#include <string>
-#include <type_traits>
+#include <thread>
 #include <utility>
 #include <vector>
 
-#include "absl/functional/any_invocable.h"
-#include "absl/status/status.h"
-#include "absl/status/statusor.h"
-#include "absl/strings/match.h"
-#include "absl/strings/str_cat.h"
-#include "absl/strings/string_view.h"
-
 namespace jjaro {
-namespace {
-using UniqueFile = std::unique_ptr<FILE, absl::AnyInvocable<void(FILE *)>>;
-using UniqueDir = std::unique_ptr<DIR, absl::AnyInvocable<void(DIR *)>>;
-UniqueFile OpenUniqueFile(const char *__restrict__ path,
-                          const char *__restrict__ mode) {
-  return UniqueFile(fopen(path, mode), [](FILE *fp) { fclose(fp); });
-}
-UniqueDir OpenUniqueDir(const char *path) {
-  return UniqueDir(opendir(path), [](DIR *dp) { closedir(dp); });
-}
-absl::StatusOr<std::string> Hostname() {
-  const char *hostname_env = getenv("HOSTNAME");
-  if (hostname_env) return hostname_env;
-  struct utsname uts;
-  const int iret = uname(&uts);
-  if (iret == 0) return uts.nodename;
-  return absl::FailedPreconditionError("No hostname set");
-}
-
-namespace tycho {
-absl::StatusOr<std::string> GetCenterDevnode() {
-  constexpr const char *center_sysfs = "/sys/class/drm/card0-DP-1";
-  auto dp = OpenUniqueDir(center_sysfs);
-  if (!dp)
-    return absl::InternalError(
-        absl::StrCat("diropen ", center_sysfs, " failed: ", strerror(errno)));
-  while (true) {
-    errno = 0;
-    const struct dirent *const ent = readdir(dp.get());
-    if (!ent && errno)
-      return absl::InternalError(
-          absl::StrCat("readdir failed: ", strerror(errno)));
-    if (!ent)
-      return absl::NotFoundError(
-          absl::StrCat("no i2c-* entry in ", center_sysfs));
-    if (ent->d_type != DT_DIR) continue;
-    if (absl::StartsWith(ent->d_name, "i2c-"))
-      return absl::StrCat("/dev/", ent->d_name);
+Enumerator::Enumerator(
+    absl::AnyInvocable<void(uint32_t name, uint32_t version)> add_output,
+    absl::AnyInvocable<void(uint32_t name)> remove_output)
+    : add_output_(std::move(add_output)),
+      remove_output_(std::move(remove_output)),
+      display_(nullptr),
+      registry_(nullptr) {
+  display_.reset(wl_display_connect(nullptr));
+  if (!display_) {
+    fputs(
+        "Unable to connect to Wayland display; no outputs will be adjusted.\n",
+        stderr);
+    return;
+  }
+  thread_ = std::thread(WaylandThreadLoop, display_.get());
+  registry_.reset(wl_display_get_registry(display_.get()));
+  if (!registry_) {
+    fputs(
+        "Unable to connect to Wayland registry; no outputs will be adjusted.\n",
+        stderr);
+    return;
+  }
+  if (const int ret =
+          wl_registry_add_listener(registry_.get(), &kRegistryListener, this);
+      ret) {
+    absl::FPrintF(stderr,
+                  "Unable to listen to Wayland registry; no outputs will be "
+                  "adjusted (%d).\n",
+                  ret);
   }
 }
 
-absl::StatusOr<std::vector<std::string>> GetDevnodes() {
-  constexpr const char *igpu_sysfs =
-      "/sys/devices/pci0000:00/0000:00:08.1/0000:07:00.0";
-  std::vector<std::string> ret;
-  ret.reserve(3);
-  auto center = GetCenterDevnode();
-  if (center.ok()) ret.push_back(*std::move(center));
-  auto dp = OpenUniqueDir(igpu_sysfs);
-  if (!dp)
-    return absl::InternalError(
-        absl::StrCat("diropen ", igpu_sysfs, " failed: ", strerror(errno)));
-  while (true) {
-    errno = 0;
-    const struct dirent *const ent = readdir(dp.get());
-    if (!ent && errno)
-      return absl::InternalError(
-          absl::StrCat("readdir failed: ", strerror(errno)));
-    if (!ent) return ret;
-    if (ent->d_type != DT_DIR) continue;
-    if (!absl::StartsWith(ent->d_name, "i2c-")) continue;
-    auto fp = OpenUniqueFile(
-        absl::StrCat(igpu_sysfs, "/", ent->d_name, "/name").c_str(), "r");
-    if (!fp) continue;
-    std::array<char, 6> buf;
-    const size_t sret = fread(buf.data(), 1, buf.size(), fp.get());
-    if (sret != buf.size()) continue;
-    if (absl::string_view(buf.data(), buf.size()) != "DPMST\n") continue;
-    ret.push_back(absl::StrCat("/dev/", ent->d_name));
-  }
-}
-}  // namespace tycho
-}  // namespace
-
-absl::StatusOr<std::vector<std::string>> GetDevnodes() {
-  auto hostname = Hostname();
-  if (!hostname.ok()) return hostname.status();
-  if (*hostname == "tycho") {
-    return tycho::GetDevnodes();
-  }
-  return absl::FailedPreconditionError(
-      absl::StrCat("Unrecognized hostname ", *hostname));
+Enumerator::~Enumerator() {
+  registry_.reset();
+  display_.reset();
+  thread_.join();
 }
 
+void Enumerator::WaylandThreadLoop(struct wl_display *display) {
+  while (wl_display_dispatch(display) != -1)
+    ;
+}
+void Enumerator::HandleGlobal(void *enumerator, struct wl_registry *,
+                              uint32_t name, const char *interface,
+                              uint32_t version) {
+  auto that = static_cast<Enumerator *>(enumerator);
+  if (absl::string_view(interface) != wl_output_interface.name) return;
+  that->output_names_.push_back(name);
+  that->add_output_(name, version);
+}
+void Enumerator::HandleGlobalRemove(void *enumerator, struct wl_registry *,
+                                    uint32_t name) {
+  auto that = static_cast<Enumerator *>(enumerator);
+  for (auto it = that->output_names_.cbegin(); it != that->output_names_.cend();
+       ++it) {
+    if (*it != name) continue;
+    that->output_names_.erase(it);
+    that->remove_output_(name);
+    return;
+  }
+}
 }  // namespace jjaro

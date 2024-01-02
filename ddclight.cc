@@ -1,30 +1,32 @@
+#include <absl/functional/any_invocable.h>
+#include <absl/strings/numbers.h>
+#include <absl/strings/str_format.h>
+#include <absl/strings/string_view.h>
 #include <sdbus-c++/IConnection.h>
 
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <memory>
-#include <string>
 
-#include "absl/strings/numbers.h"
-#include "absl/strings/str_format.h"
-#include "absl/strings/string_view.h"
 #include "client.h"
 #include "server.h"
 
 int main(int argc, char** argv) {
   if (argc == 2 && argv && argv[1] && absl::string_view(argv[1]) == "get") {
     auto connection = sdbus::createSessionBusConnection();
-    absl::PrintF("%d #000000ff #ffffffff #ffffffff\n", jjaro::DDCLightProxy(*connection, "org.jjaro.ddclight",
-                                              "/org/jjaro/ddclight")
-                             .get());
+    absl::PrintF("%d #000000ff #ffffffff #ffffffff\n",
+                 jjaro::DDCLightProxy(*connection, "org.jjaro.ddclight",
+                                      "/org/jjaro/ddclight")
+                     .get());
     return EXIT_SUCCESS;
   } else if (argc == 2 && argv && argv[1] &&
              absl::string_view(argv[1]) == "poke") {
     auto connection = sdbus::createSessionBusConnection();
-    absl::PrintF("%d #000000ff #ffffffff #ffffffff\n", jjaro::DDCLightProxy(*connection, "org.jjaro.ddclight",
-                                              "/org/jjaro/ddclight")
-                             .poke());
+    absl::PrintF("%d #000000ff #ffffffff #ffffffff\n",
+                 jjaro::DDCLightProxy(*connection, "org.jjaro.ddclight",
+                                      "/org/jjaro/ddclight")
+                     .poke());
     return EXIT_SUCCESS;
   } else if (argc == 3 && argv && argv[1] &&
              absl::string_view(argv[1]) == "set") {

@@ -1,15 +1,16 @@
-DEPS="sdbus-c++ absl_str_format absl_strings absl_status absl_statusor absl_time absl_span absl_synchronization absl_core_headers absl_any_invocable absl_function_ref"
+DEPS="sdbus-c++ absl_str_format absl_strings absl_status absl_statusor absl_time absl_span absl_synchronization absl_core_headers absl_any_invocable absl_function_ref wayland-client"
 
 all: ddclight
 
-format: ddclight.cc client.h server.h ddc.h ddc.cc enumerate.h enumerate.cc thread.h thread.cc state.h
+format: ddclight.cc client.h server.h server.cc ddc.h ddc.cc enumerate.h enumerate.cc output.h output.cc state.h deleter.h
 	clang-format -i --style=Google $^
 
 iwyu:
 	include-what-you-use -Xiwyu --no_comments -Xiwyu --no_fwd_decls -std=c++17 ddclight.cc `pkg-config --cflags $(DEPS)`
 	include-what-you-use -Xiwyu --no_comments -Xiwyu --no_fwd_decls -std=c++17 ddc.cc `pkg-config --cflags $(DEPS)`
 	include-what-you-use -Xiwyu --no_comments -Xiwyu --no_fwd_decls -std=c++17 enumerate.cc `pkg-config --cflags $(DEPS)`
-	include-what-you-use -Xiwyu --no_comments -Xiwyu --no_fwd_decls -std=c++17 thread.cc `pkg-config --cflags $(DEPS)`
+	include-what-you-use -Xiwyu --no_comments -Xiwyu --no_fwd_decls -std=c++17 output.cc `pkg-config --cflags $(DEPS)`
+	include-what-you-use -Xiwyu --no_comments -Xiwyu --no_fwd_decls -std=c++17 server.cc `pkg-config --cflags $(DEPS)`
 
 %-client-glue.h: %.xml
 	sdbus-c++-xml2cpp $^ --proxy=$@
@@ -19,7 +20,7 @@ iwyu:
 	sdbus-c++-xml2cpp $^ --adaptor=$@
 	clang-format -i --style=Google $@
 
-ddclight: ddclight.o ddc.o enumerate.o thread.o
+ddclight: ddclight.o ddc.o enumerate.o output.o server.o
 	$(CXX) $(CXXFLAGS) -std=c++17 -o $@ $^ `pkg-config --libs $(DEPS)`
 
 ddclight.o: ddclight.cc ddclight-client-glue.h ddclight-server-glue.h
@@ -31,7 +32,10 @@ ddc.o: ddc.cc
 enumerate.o: enumerate.cc
 	$(CXX) $(CXXFLAGS) -std=c++17 -c -o $@ $< `pkg-config --cflags $(DEPS)`
 
-thread.o: thread.cc
+output.o: output.cc
+	$(CXX) $(CXXFLAGS) -std=c++17 -c -o $@ $< `pkg-config --cflags $(DEPS)`
+
+server.o: server.cc
 	$(CXX) $(CXXFLAGS) -std=c++17 -c -o $@ $< `pkg-config --cflags $(DEPS)`
 
 clean:

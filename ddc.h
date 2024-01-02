@@ -1,21 +1,21 @@
 #ifndef JJARO_DDC_H_
 #define JJARO_DDC_H_ 1
+#include <absl/functional/function_ref.h>
+#include <absl/status/status.h>
+#include <absl/status/statusor.h>
+#include <absl/strings/string_view.h>
+#include <absl/types/span.h>
+
 #include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
 #include <utility>
 
-#include "absl/functional/function_ref.h"
-#include "absl/status/status.h"
-#include "absl/status/statusor.h"
-#include "absl/strings/string_view.h"
-#include "absl/types/span.h"
-
 namespace jjaro {
 class DDCDevice {
  public:
-  static absl::StatusOr<DDCDevice> Open(std::string devnode);
+  static absl::StatusOr<DDCDevice> Open(std::string devnode, int fd = -1);
   DDCDevice(DDCDevice &&);
   DDCDevice &operator=(DDCDevice &&);
   ~DDCDevice();
