@@ -15,7 +15,7 @@
 int main(int argc, char** argv) {
   if (argc == 2 && argv && argv[1] && absl::string_view(argv[1]) == "get") {
     auto connection = sdbus::createSessionBusConnection();
-    absl::PrintF("%d #000000ff #ffffffff #ffffffff\n",
+    absl::PrintF("%d ddclight\n",
                  jjaro::DDCLightProxy(*connection, "org.jjaro.ddclight",
                                       "/org/jjaro/ddclight")
                      .get());
@@ -23,7 +23,7 @@ int main(int argc, char** argv) {
   } else if (argc == 2 && argv && argv[1] &&
              absl::string_view(argv[1]) == "poke") {
     auto connection = sdbus::createSessionBusConnection();
-    absl::PrintF("%d #000000ff #ffffffff #ffffffff\n",
+    absl::PrintF("%d ddclight\n",
                  jjaro::DDCLightProxy(*connection, "org.jjaro.ddclight",
                                       "/org/jjaro/ddclight")
                      .poke());
@@ -33,7 +33,7 @@ int main(int argc, char** argv) {
     int64_t arg;
     if (argv[2] && absl::SimpleAtoi(argv[2], &arg)) {
       auto connection = sdbus::createSessionBusConnection();
-      absl::PrintF("%d #000000ff #ffffffff #ffffffff\n",
+      absl::PrintF("%d ddclight\n",
                    jjaro::DDCLightProxy(*connection, "org.jjaro.ddclight",
                                         "/org/jjaro/ddclight")
                        .set(arg));
@@ -44,7 +44,7 @@ int main(int argc, char** argv) {
     int64_t arg;
     if (argv[2] && absl::SimpleAtoi(argv[2], &arg)) {
       auto connection = sdbus::createSessionBusConnection();
-      absl::PrintF("%d #000000ff #ffffffff #ffffffff\n",
+      absl::PrintF("%d ddclight\n",
                    jjaro::DDCLightProxy(*connection, "org.jjaro.ddclight",
                                         "/org/jjaro/ddclight")
                        .increment(arg));
@@ -55,7 +55,7 @@ int main(int argc, char** argv) {
     int64_t arg;
     if (argv[2] && absl::SimpleAtoi(argv[2], &arg)) {
       auto connection = sdbus::createSessionBusConnection();
-      absl::PrintF("%d #000000ff #ffffffff #ffffffff\n",
+      absl::PrintF("%d ddclight\n",
                    jjaro::DDCLightProxy(*connection, "org.jjaro.ddclight",
                                         "/org/jjaro/ddclight")
                        .decrement(arg));
