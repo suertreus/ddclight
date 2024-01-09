@@ -152,7 +152,7 @@ void Output::ThreadLoop(Output *that) {
   int last_desired_percentage;
   {
     absl::MutexLock l(&that->state_->lock);
-    if (!that->state_->init) {
+    if (!that->state_->desired_percentage.has_value()) {
       int try_count = 0;
       that->state_->desired_percentage =
           that->ddc_
@@ -160,7 +160,7 @@ void Output::ThreadLoop(Output *that) {
                   [&try_count]() -> bool { return try_count++; })
               .value_or(50);
     }
-    last_desired_percentage = that->state_->desired_percentage;
+    last_desired_percentage = that->state_->desired_percentage.value_or(50);
   }
   while (true) {
     const auto ss = that->ddc_->SetBrightnessPercent(
@@ -169,7 +169,7 @@ void Output::ThreadLoop(Output *that) {
     absl::MutexLock l(&that->state_->lock);
     if (ss.ok()) {
       if (that->WaitForNewTargetOrCancel(absl::Minutes(1))) return;
-      last_desired_percentage = that->state_->desired_percentage;
+      last_desired_percentage = that->state_->desired_percentage.value_or(50);
     } else {
 #ifndef NDEBUG
       absl::FPrintF(stderr,

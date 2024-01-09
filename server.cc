@@ -34,40 +34,44 @@ void DDCLight::RemoveOutput(uint32_t name) {
 
 int64_t DDCLight::get() {
   absl::MutexLock l(&state_.lock);
-  return state_.desired_percentage;
+  return state_.desired_percentage.value_or(50);
 }
 int64_t DDCLight::poke() {
-  emitWatch(state_.desired_percentage);
-  return state_.desired_percentage;
+  emitWatch(state_.desired_percentage.value_or(50));
+  return state_.desired_percentage.value_or(50);
 }
 int64_t DDCLight::set(const int64_t& percentage) {
   const int real_percentage = std::clamp(percentage, int64_t{0}, int64_t{100});
   absl::MutexLock l(&state_.lock);
-  if (state_.desired_percentage == real_percentage)
-    return state_.desired_percentage;
+  if (state_.desired_percentage.has_value() &&
+      *state_.desired_percentage == real_percentage)
+    return *state_.desired_percentage;
   state_.desired_percentage = real_percentage;
-  emitWatch(state_.desired_percentage);
-  return state_.desired_percentage;
+  emitWatch(*state_.desired_percentage);
+  return *state_.desired_percentage;
 }
 int64_t DDCLight::increment(const int64_t& percentage) {
   const int real_percentage = std::clamp(percentage, int64_t{0}, int64_t{100});
   absl::MutexLock l(&state_.lock);
-  if (real_percentage == 0) return state_.desired_percentage;
-  if (state_.desired_percentage == 100) return state_.desired_percentage;
-  state_.desired_percentage =
-      std::min(int64_t{100}, state_.desired_percentage + percentage);
-  emitWatch(state_.desired_percentage);
-  return state_.desired_percentage;
+  if (real_percentage == 0) return state_.desired_percentage.value_or(50);
+  if (state_.desired_percentage.has_value() &&
+      *state_.desired_percentage == 100)
+    return *state_.desired_percentage;
+  state_.desired_percentage = std::min(
+      int64_t{100}, state_.desired_percentage.value_or(50) + percentage);
+  emitWatch(*state_.desired_percentage);
+  return *state_.desired_percentage;
 }
 int64_t DDCLight::decrement(const int64_t& percentage) {
   const int real_percentage = std::clamp(percentage, int64_t{0}, int64_t{100});
   absl::MutexLock l(&state_.lock);
-  if (real_percentage == 0) return state_.desired_percentage;
-  if (state_.desired_percentage == 0) return state_.desired_percentage;
+  if (real_percentage == 0) return state_.desired_percentage.value_or(50);
+  if (state_.desired_percentage.has_value() && *state_.desired_percentage == 0)
+    return *state_.desired_percentage;
   state_.desired_percentage =
-      std::max(int64_t{0}, state_.desired_percentage - percentage);
-  emitWatch(state_.desired_percentage);
-  return state_.desired_percentage;
+      std::max(int64_t{0}, state_.desired_percentage.value_or(50) - percentage);
+  emitWatch(*state_.desired_percentage);
+  return *state_.desired_percentage;
 }
 
 }  // namespace jjaro

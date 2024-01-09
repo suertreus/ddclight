@@ -3,11 +3,12 @@
 #include <absl/base/thread_annotations.h>
 #include <absl/synchronization/mutex.h>
 
+#include <optional>
+
 namespace jjaro {
 struct State {
   absl::Mutex lock;
-  int desired_percentage ABSL_GUARDED_BY(lock);
-  bool init ABSL_GUARDED_BY(lock) = false;
+  std::optional<int> desired_percentage ABSL_GUARDED_BY(lock);
 };
 }  // namespace jjaro
 #endif  // JJARO_STATE_H_
