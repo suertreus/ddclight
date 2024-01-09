@@ -17,8 +17,6 @@
 
 namespace jjaro {
 
-// XXX: infer desired initial brightness from primary display
-
 class DDCLight final
     : public sdbus::AdaptorInterfaces<org::jjaro::DDCLight_adaptor> {
  public:

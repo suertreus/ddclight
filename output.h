@@ -1,9 +1,9 @@
 #ifndef JJARO_OUTPUT_H_
 #define JJARO_OUTPUT_H_ 1
 
+#include <absl/time/time.h>
 #include <wayland-client-protocol.h>
 
-#include <absl/time/time.h>
 #include <atomic>
 #include <cstdint>
 #include <memory>

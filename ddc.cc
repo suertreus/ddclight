@@ -56,16 +56,21 @@ absl::StatusOr<DDCDevice> DDCDevice::Open(std::string devnode, int fd) {
   return DDCDevice(std::move(devnode), fd);
 }
 DDCDevice::DDCDevice(DDCDevice &&that)
-    : fd_(that.fd_),
+    : devnode_(std::move(that.devnode_)),
+      fd_(that.fd_),
       cached_brightness_(that.cached_brightness_),
       cached_max_brightness_(that.cached_max_brightness_) {
+  that.devnode_ = "moved-from";
   that.fd_ = -1;
 }
 DDCDevice &DDCDevice::operator=(DDCDevice &&that) {
+  if (&that == this) return *this;
   close(fd_);
+  devnode_ = std::move(that.devnode_);
   fd_ = that.fd_;
   cached_brightness_ = that.cached_brightness_;
   cached_max_brightness_ = that.cached_max_brightness_;
+  that.devnode_ = "moved-from";
   that.fd_ = -1;
   return *this;
 }

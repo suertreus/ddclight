@@ -1,10 +1,10 @@
 #include "enumerate.h"
 
-#include <wayland-util.h>
-
 #include <absl/functional/any_invocable.h>
 #include <absl/strings/str_format.h>
 #include <absl/strings/string_view.h>
+#include <wayland-util.h>
+
 #include <cstdio>
 #include <memory>
 #include <thread>

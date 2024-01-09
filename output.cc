@@ -1,13 +1,5 @@
 #include "output.h"
 
-#include <dirent.h>
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <sys/sysmacros.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <wayland-util.h>
-
 #include <absl/functional/function_ref.h>
 #include <absl/status/status.h>
 #include <absl/status/statusor.h>
@@ -17,6 +9,14 @@
 #include <absl/strings/string_view.h>
 #include <absl/strings/strip.h>
 #include <absl/synchronization/mutex.h>
+#include <dirent.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/sysmacros.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <wayland-util.h>
+
 #include <algorithm>
 #include <array>
 #include <cerrno>
@@ -171,6 +171,14 @@ void Output::ThreadLoop(Output *that) {
       if (that->WaitForNewTargetOrCancel(absl::Minutes(1))) return;
       last_desired_percentage = that->state_->desired_percentage;
     } else {
+#ifndef NDEBUG
+      absl::FPrintF(stderr,
+                    "Failed to set brightness to %d on output %s (%s:%s) %s: "
+                    "%s\nWill retry in %v.\n",
+                    last_desired_percentage, that->name_, that->make_,
+                    that->model_, that->ddc_->devnode(), ss.ToString(),
+                    absl::Minutes(1));
+#endif
       if (that->WaitForDurationOrCancel(absl::Minutes(1))) return;
     }
   }
@@ -186,6 +194,13 @@ bool Output::WaitForNewTargetOrCancel(absl::Duration d) {
     state_->lock.Await(absl::Condition(&cond));
     return cancel_.load(std::memory_order_relaxed);
   } else {
+#ifndef NDEBUG
+    absl::FPrintF(stderr,
+                  "Failed to get brightness on output %s (%s:%s) %s: %s\nWill "
+                  "retry in %v.\n",
+                  name_, make_, model_, ddc_->devnode(),
+                  current_percent.status().ToString(), d);
+#endif
     return WaitForDurationOrCancel(d);
   }
 }
@@ -202,47 +217,48 @@ void Output::HandleGeometry(void *output, struct wl_output *, int32_t, int32_t,
   auto that = static_cast<Output *>(output);
   that->new_make_.assign(make);
   that->new_model_.assign(model);
-};
+}
 void Output::HandleMode(void *, struct wl_output *, uint32_t, int32_t, int32_t,
-                        int32_t){};
+                        int32_t) {}
 void Output::HandleDone(void *output, struct wl_output *) {
   auto that = static_cast<Output *>(output);
-  if (std::tie(that->make_, that->model_, that->name_) !=
-      std::tie(that->new_make_, that->new_model_, that->new_name_)) {
-    if (that->thread_) {
-      {
-        absl::MutexLock l(&that->state_->lock);
-        that->cancel_.store(true, std::memory_order_relaxed);
-      }
-      that->thread_->join();
+  if (std::tie(that->make_, that->model_, that->name_) ==
+      std::tie(that->new_make_, that->new_model_, that->new_name_))
+    return;
+  if (that->thread_) {
+    {
+      absl::MutexLock l(&that->state_->lock);
+      that->cancel_.store(true, std::memory_order_relaxed);
     }
-    if (absl::StatusOr<DDCDevice> ddc = DDCForName(that->new_name_); ddc.ok()) {
-      that->ddc_.emplace(*std::move(ddc));
-      {
-        absl::MutexLock l(&that->state_->lock);
-        that->cancel_.store(false, std::memory_order_relaxed);
-      }
-      that->thread_.emplace(ThreadLoop, that);
-      absl::FPrintF(stderr, "Watching DDC devnode %s for output %s (%s:%s).\n",
-                    that->ddc_->devnode(), that->new_name_, that->new_make_,
-                    that->new_model_);
-    } else {
-      absl::FPrintF(
-          stderr,
-          "Failed to infer DDC devnode for output %s; won't adjust (%s).\n",
-          that->new_name_, ddc.status().ToString());
-      that->ddc_.reset();
-      that->thread_.reset();
-    }
+    that->thread_->join();
   }
   that->make_ = std::move(that->new_make_);
   that->model_ = std::move(that->new_model_);
   that->name_ = std::move(that->new_name_);
-};
-void Output::HandleScale(void *, struct wl_output *, int32_t){};
+  if (absl::StatusOr<DDCDevice> ddc = DDCForName(that->name_); ddc.ok()) {
+    that->ddc_.emplace(*std::move(ddc));
+    {
+      absl::MutexLock l(&that->state_->lock);
+      that->cancel_.store(false, std::memory_order_relaxed);
+    }
+    that->thread_.emplace(ThreadLoop, that);
+    absl::FPrintF(stderr, "Watching DDC devnode for output %s (%s:%s) %s.\n",
+                  that->name_, that->make_, that->model_,
+                  that->ddc_->devnode());
+  } else {
+    absl::FPrintF(stderr,
+                  "Failed to infer DDC devnode for output %s (%s:%s); won't "
+                  "adjust: %s.\n",
+                  that->name_, that->make_, that->model_,
+                  ddc.status().ToString());
+    that->ddc_.reset();
+    that->thread_.reset();
+  }
+}
+void Output::HandleScale(void *, struct wl_output *, int32_t) {}
 void Output::HandleName(void *output, struct wl_output *, const char *name) {
   auto that = static_cast<Output *>(output);
   that->new_name_ = std::string(name);
-};
-void Output::HandleDescription(void *, struct wl_output *, const char *){};
+}
+void Output::HandleDescription(void *, struct wl_output *, const char *) {}
 }  // namespace jjaro
