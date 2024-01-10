@@ -44,7 +44,6 @@ class Output {
   };
   uint32_t wayland_name_;
   std::unique_ptr<struct wl_output, Deleter<wl_output_destroy>> output_;
-  // TODO: accept per-make/model configuration of brightness curves.
   std::string make_, model_, name_;
   std::string new_make_, new_model_, new_name_;
   State *state_;

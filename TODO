@@ -1,0 +1,12 @@
+Factor Enumeration out into an interface or two, and add implementations
+  sway-ipc(7) can tell which output is primary
+  X11
+    https://xcb.freedesktop.org/manual/group__XCB__RandR__API.html
+  Non-graphical session support
+    https://www.freedesktop.org/wiki/Software/systemd/logind
+  Just do all the outputs
+Factor Control out into an interface and add implementation
+  Backlight: find a folder F under the output where F/subsystem links to /sys/class/backlight
+Try other I2C buses matching /sys/class/drm/card*-$name/i2c-*
+DP MST support
+Per-make/model configuration of brightness curves
