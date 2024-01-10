@@ -1,4 +1,4 @@
-#include "ddc.h"
+#include "control-ddc-i2c.h"
 
 #include <absl/functional/function_ref.h>
 #include <absl/status/status.h>
@@ -40,7 +40,7 @@ constexpr std::byte Checksum(absl::Span<const std::byte> buf) {
 }
 }  // namespace
 
-absl::StatusOr<DDCDevice> DDCDevice::Open(std::string devnode, int fd) {
+absl::StatusOr<I2CDDCControl> I2CDDCControl::Open(std::string devnode, int fd) {
   if (fd == -1) {
     fd = open(devnode.c_str(), O_RDWR);
     if (fd == -1)
@@ -53,36 +53,32 @@ absl::StatusOr<DDCDevice> DDCDevice::Open(std::string devnode, int fd) {
                                             absl::Hex(kDeviceBusAddr),
                                             " failed: ", strerror(errno)));
   }
-  return DDCDevice(std::move(devnode), fd);
+  return I2CDDCControl(std::move(devnode), fd);
 }
-DDCDevice::DDCDevice(DDCDevice &&that)
-    : devnode_(std::move(that.devnode_)),
+I2CDDCControl::I2CDDCControl(I2CDDCControl &&that)
+    : Control(std::move(that)),
       fd_(that.fd_),
-      cached_brightness_(that.cached_brightness_),
-      cached_max_brightness_(that.cached_max_brightness_) {
-  that.devnode_ = "moved-from";
+      max_brightness_(that.max_brightness_) {
   that.fd_ = -1;
 }
-DDCDevice &DDCDevice::operator=(DDCDevice &&that) {
+I2CDDCControl &I2CDDCControl::operator=(I2CDDCControl &&that) {
   if (&that == this) return *this;
-  close(fd_);
-  devnode_ = std::move(that.devnode_);
+  Control::operator=(std::move(that));
+  if (fd_ >= 0) close(fd_);
   fd_ = that.fd_;
-  cached_brightness_ = that.cached_brightness_;
-  cached_max_brightness_ = that.cached_max_brightness_;
-  that.devnode_ = "moved-from";
+  max_brightness_ = that.max_brightness_;
   that.fd_ = -1;
   return *this;
 }
-DDCDevice::~DDCDevice() {
+I2CDDCControl::~I2CDDCControl() {
   if (fd_ >= 0) close(fd_);
 }
 
-absl::StatusOr<int> DDCDevice::GetBrightnessPercent(
+absl::StatusOr<int> I2CDDCControl::GetBrightnessPercentImpl(
     absl::FunctionRef<bool()> cancel) {
   if (fd_ == -1)
-    return absl::FailedPreconditionError("GetBrightness moved-from DDCDevice");
-  const auto error = absl::StrCat("GetBrightness ", devnode_);
+    return absl::FailedPreconditionError("GetBrightness moved-from I2CDDCControl");
+  const auto error = absl::StrCat("GetBrightness ", name());
   std::array<std::byte, 6> req{kDeviceWriteAddr, kHostWriteAddr, LengthByte(2),
                                kOpCodeGetVCPReq, kVCPBrightness, std::byte{0}};
   req.back() = Checksum(req);
@@ -103,21 +99,21 @@ absl::StatusOr<int> DDCDevice::GetBrightnessPercent(
     if (!vs.ok()) continue;
     break;
   }
-  cached_brightness_ =
+  const int brightness =
       static_cast<uint16_t>(resp[9]) << 8 | static_cast<uint16_t>(resp[10]);
-  cached_max_brightness_ =
+  max_brightness_ =
       static_cast<uint16_t>(resp[7]) << 8 | static_cast<uint16_t>(resp[8]);
-  return 100 * int{*cached_brightness_} / *cached_max_brightness_;
+  return 100 * brightness / *max_brightness_;
 }
 
-absl::Status DDCDevice::SetBrightnessPercent(int percent,
+absl::Status I2CDDCControl::SetBrightnessPercentImpl(int percent,
                                              absl::FunctionRef<bool()> cancel) {
   if (fd_ == -1)
-    return absl::FailedPreconditionError("SetBrightness moved-from DDCDevice");
-  if (!cached_max_brightness_.has_value())
+    return absl::FailedPreconditionError("SetBrightness moved-from I2CDDCControl");
+  if (!max_brightness_.has_value())
     if (auto gbs = GetBrightnessPercent(cancel); !gbs.ok()) return gbs.status();
-  const auto error = absl::StrCat("SetBrightness ", devnode_);
-  uint16_t val = percent * *cached_max_brightness_ / 100;
+  const auto error = absl::StrCat("SetBrightness ", name());
+  uint16_t val = percent * *max_brightness_ / 100;
   std::array<std::byte, 8> req{kDeviceWriteAddr,
                                kHostWriteAddr,
                                LengthByte(4),
@@ -132,17 +128,10 @@ absl::Status DDCDevice::SetBrightnessPercent(int percent,
     if (!ws.ok()) continue;
     break;
   }
-  cached_brightness_ = percent;
   return absl::OkStatus();
 }
 
-absl::StatusOr<int> DDCDevice::cached_brightness_percent() const {
-  if (!cached_brightness_.has_value() || !cached_max_brightness_.has_value())
-    return absl::FailedPreconditionError("uninitialized brightness");
-  return 100 * int{*cached_brightness_} / *cached_max_brightness_;
-}
-
-absl::Status DDCDevice::TryWrite(absl::Span<const std::byte> buf,
+absl::Status I2CDDCControl::TryWrite(absl::Span<const std::byte> buf,
                                  absl::string_view error) {
   const ssize_t wret = write(fd_, buf.data(), buf.size());
   if (wret < 0)
@@ -153,7 +142,7 @@ absl::Status DDCDevice::TryWrite(absl::Span<const std::byte> buf,
         absl::StrCat(error, " short write: ", strerror(errno)));
   return absl::OkStatus();
 }
-absl::Status DDCDevice::TryRead(absl::Span<std::byte> buf,
+absl::Status I2CDDCControl::TryRead(absl::Span<std::byte> buf,
                                 absl::string_view error) {
   const ssize_t rret = read(fd_, buf.data(), buf.size());
   if (rret < 0)
@@ -164,7 +153,7 @@ absl::Status DDCDevice::TryRead(absl::Span<std::byte> buf,
         absl::StrCat(error, " short read: ", strerror(errno)));
   return absl::OkStatus();
 }
-absl::Status DDCDevice::ValidateBrightnessResp(absl::Span<const std::byte> buf,
+absl::Status I2CDDCControl::ValidateBrightnessResp(absl::Span<const std::byte> buf,
                                                absl::string_view error) {
   if (buf[1] != kDeviceWriteAddr)
     return absl::InternalError(absl::StrCat(

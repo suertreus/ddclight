@@ -11,7 +11,7 @@
 #include <string>
 #include <thread>
 
-#include "ddc.h"
+#include "control.h"
 #include "deleter.h"
 #include "enumerate.h"
 #include "state.h"
@@ -50,7 +50,7 @@ class Output {
   // Writes to `cancel_` are guarded by `state_->lock`.  This is necessary to
   // use that lock to wait on changes to this variable.
   std::atomic<bool> cancel_;
-  std::optional<DDCDevice> ddc_;
+  std::unique_ptr<Control> control_;
   std::optional<std::thread> thread_;
 };
 }  // namespace jjaro

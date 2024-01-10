@@ -20,8 +20,8 @@ add_custom_command(
 
 add_executable(
     ddclight
-    ddclight.cc ddc.cc enumerate.cc output.cc server.cc
-    client.h ddc.h enumerate.h server.h state.h output.h deleter.h
+    ddclight.cc control-ddc-i2c.cc enumerate.cc output.cc server.cc
+    client.h control-ddc-i2c.h enumerate.h server.h state.h output.h deleter.h
     ${CMAKE_CURRENT_BINARY_DIR}/ddclight-client-glue.h ${CMAKE_CURRENT_BINARY_DIR}/ddclight-server-glue.h
 )
 

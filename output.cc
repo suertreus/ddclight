@@ -27,9 +27,11 @@
 #include <tuple>
 #include <utility>
 
+#include "control-ddc-i2c.h"
+
 namespace jjaro {
 namespace {
-absl::StatusOr<DDCDevice> DDCForName(absl::string_view name) {
+absl::StatusOr<I2CDDCControl> DDCForName(absl::string_view name) {
   std::string dir("/sys/class/drm");
   std::string devnode("/dev/");
   {
@@ -108,7 +110,7 @@ absl::StatusOr<DDCDevice> DDCForName(absl::string_view name) {
       return absl::NotFoundError(
           absl::StrCat(devnode, " major/minor don't match ", dir));
   }
-  auto ddc = DDCDevice::Open(std::move(devnode), fd);
+  auto ddc = I2CDDCControl::Open(std::move(devnode), fd);
   if (!ddc.ok()) close(fd);
   return ddc;
 }
@@ -155,7 +157,7 @@ void Output::ThreadLoop(Output *that) {
     if (!that->state_->desired_percentage.has_value()) {
       int try_count = 0;
       that->state_->desired_percentage =
-          that->ddc_
+          that->control_
               ->GetBrightnessPercent(
                   [&try_count]() -> bool { return try_count++; })
               .value_or(50);
@@ -163,7 +165,7 @@ void Output::ThreadLoop(Output *that) {
     last_desired_percentage = that->state_->desired_percentage.value_or(50);
   }
   while (true) {
-    const auto ss = that->ddc_->SetBrightnessPercent(
+    const auto ss = that->control_->SetBrightnessPercent(
         last_desired_percentage,
         [that] { return that->cancel_.load(std::memory_order_relaxed); });
     absl::MutexLock l(&that->state_->lock);
@@ -176,7 +178,7 @@ void Output::ThreadLoop(Output *that) {
                     "Failed to set brightness to %d on output %s (%s:%s) %s: "
                     "%s\nWill retry in %v.\n",
                     last_desired_percentage, that->name_, that->make_,
-                    that->model_, that->ddc_->devnode(), ss.ToString(),
+                    that->model_, that->control_->name(), ss.ToString(),
                     absl::Minutes(1));
 #endif
       if (that->WaitForDurationOrCancel(absl::Minutes(1))) return;
@@ -185,7 +187,7 @@ void Output::ThreadLoop(Output *that) {
 }
 
 bool Output::WaitForNewTargetOrCancel(absl::Duration d) {
-  const auto current_percent = ddc_->cached_brightness_percent();
+  const auto current_percent = control_->cached_brightness_percent();
   if (current_percent.ok()) {
     auto cond = [this, old = *current_percent] {
       return cancel_.load(std::memory_order_relaxed) ||
@@ -198,7 +200,7 @@ bool Output::WaitForNewTargetOrCancel(absl::Duration d) {
     absl::FPrintF(stderr,
                   "Failed to get brightness on output %s (%s:%s) %s: %s\nWill "
                   "retry in %v.\n",
-                  name_, make_, model_, ddc_->devnode(),
+                  name_, make_, model_, control_->name(),
                   current_percent.status().ToString(), d);
 #endif
     return WaitForDurationOrCancel(d);
@@ -235,8 +237,8 @@ void Output::HandleDone(void *output, struct wl_output *) {
   that->make_ = std::move(that->new_make_);
   that->model_ = std::move(that->new_model_);
   that->name_ = std::move(that->new_name_);
-  if (absl::StatusOr<DDCDevice> ddc = DDCForName(that->name_); ddc.ok()) {
-    that->ddc_.emplace(*std::move(ddc));
+  if (absl::StatusOr<I2CDDCControl> ddc = DDCForName(that->name_); ddc.ok()) {
+    that->control_ = std::make_unique<I2CDDCControl>(*std::move(ddc));
     {
       absl::MutexLock l(&that->state_->lock);
       that->cancel_.store(false, std::memory_order_relaxed);
@@ -244,14 +246,14 @@ void Output::HandleDone(void *output, struct wl_output *) {
     that->thread_.emplace(ThreadLoop, that);
     absl::FPrintF(stderr, "Watching DDC devnode for output %s (%s:%s) %s.\n",
                   that->name_, that->make_, that->model_,
-                  that->ddc_->devnode());
+                  that->control_->name());
   } else {
     absl::FPrintF(stderr,
                   "Failed to infer DDC devnode for output %s (%s:%s); won't "
                   "adjust: %s.\n",
                   that->name_, that->make_, that->model_,
                   ddc.status().ToString());
-    that->ddc_.reset();
+    that->control_.reset();
     that->thread_.reset();
   }
 }
