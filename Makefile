@@ -1,7 +1,7 @@
 DEPS=sdbus-c++ absl_str_format absl_strings absl_status absl_statusor absl_time absl_span absl_synchronization absl_core_headers absl_any_invocable absl_function_ref wayland-client
-HDRS=client.h server.h control-ddc-i2c.h enumerate.h output.h state.h deleter.h control.h
-SRCS=ddclight.cc server.cc control-ddc-i2c.cc enumerate.cc output.cc
-OBJS=ddclight.o server.o control-ddc-i2c.o enumerate.o output.o
+HDRS=client.h control-backlight.h control-ddc-i2c.h control.h deleter.h enumerate.h fd-holder.h misc.h output.h server.h state.h
+SRCS=control-backlight.cc control.cc control-ddc-i2c.cc ddclight.cc enumerate.cc fd-holder.cc misc.cc output.cc server.cc
+OBJS=control-backlight.o control.o control-ddc-i2c.o ddclight.o enumerate.o fd-holder.o misc.o output.o server.o
 CXXFLAGS+=-Wno-subobject-linkage -Wno-ignored-attributes -Wno-unknown-warning-option
 
 all: ddclight

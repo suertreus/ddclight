@@ -15,6 +15,7 @@
 namespace jjaro {
 class Control {
  public:
+  static absl::StatusOr<std::unique_ptr<Control>> Probe(absl::string_view output);
   virtual ~Control() = default;
   absl::StatusOr<int> GetBrightnessPercent(absl::FunctionRef<bool()> cancel = [] { return false; }) {
     auto ret = GetBrightnessPercentImpl(cancel);

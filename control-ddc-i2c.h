@@ -13,18 +13,19 @@
 #include <utility>
 
 #include "control.h"
+#include "fd-holder.h"
 
 namespace jjaro {
 class I2CDDCControl : public Control {
  public:
-  static absl::StatusOr<I2CDDCControl> Open(std::string devnode, int fd = -1);
-  I2CDDCControl(I2CDDCControl &&);
-  I2CDDCControl &operator=(I2CDDCControl &&);
-  ~I2CDDCControl() override;
+  static absl::StatusOr<std::optional<I2CDDCControl>> Probe(absl::string_view output, absl::string_view output_dir);
+  I2CDDCControl(I2CDDCControl &&) = default;
+  I2CDDCControl &operator=(I2CDDCControl &&) = default;
+  ~I2CDDCControl() override = default;
 
  private:
-  I2CDDCControl(std::string devnode, int fd)
-      : Control(std::move(devnode)), fd_(fd) {}
+  I2CDDCControl(std::string dev, FDHolder fd)
+      : Control(std::move(dev)), fd_(std::move(fd)) {}
   absl::StatusOr<int> GetBrightnessPercentImpl(absl::FunctionRef<bool()> cancel) override;
   absl::Status SetBrightnessPercentImpl(int percent, absl::FunctionRef<bool()> cancel) override;
   absl::Status TryWrite(absl::Span<const std::byte> buf,
@@ -33,8 +34,8 @@ class I2CDDCControl : public Control {
   static absl::Status ValidateBrightnessResp(absl::Span<const std::byte> buf,
                                              absl::string_view error);
 
-  int fd_;
-  std::optional<uint16_t> max_brightness_;
+  FDHolder fd_;
+  int max_brightness_;
 };
 }  // namespace jjaro
 #endif  // JJARO_CONTROL_DDC_I2C_H_
