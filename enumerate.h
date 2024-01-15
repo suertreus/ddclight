@@ -2,8 +2,8 @@
 #define JJARO_ENUMERATE_H_ 1
 
 #include <absl/functional/any_invocable.h>
-#include <wayland-client.h>
-
+#include <wayland-client-core.h>
+#include <wayland-client-protocol.h>
 #include <cstdint>
 #include <memory>
 #include <thread>

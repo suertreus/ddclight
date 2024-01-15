@@ -4,25 +4,24 @@
 #include <absl/status/status.h>
 #include <absl/status/statusor.h>
 #include <absl/strings/string_view.h>
-#include <absl/types/span.h>
-
-#include <cstddef>
-#include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
-#include <utility>
 
 namespace jjaro {
 class Control {
  public:
-  static absl::StatusOr<std::unique_ptr<Control>> Probe(absl::string_view output);
+  static absl::StatusOr<std::unique_ptr<Control>> Probe(
+      absl::string_view output);
   virtual ~Control() = default;
-  absl::StatusOr<int> GetBrightnessPercent(absl::FunctionRef<bool()> cancel = [] { return false; }) {
+  absl::StatusOr<int> GetBrightnessPercent(absl::FunctionRef<bool()> cancel =
+                                               [] { return false; }) {
     auto ret = GetBrightnessPercentImpl(cancel);
     if (ret.ok()) cached_brightness_percent_ = *ret;
     return ret;
   }
-  absl::Status SetBrightnessPercent(int percent, absl::FunctionRef<bool()> cancel = [] { return false; }) {
+  absl::Status SetBrightnessPercent(
+      int percent, absl::FunctionRef<bool()> cancel = [] { return false; }) {
     auto ret = SetBrightnessPercentImpl(percent, cancel);
     if (ret.ok()) cached_brightness_percent_ = percent;
     return ret;
@@ -42,8 +41,10 @@ class Control {
   Control &operator=(Control &&) = default;
 
  private:
-  virtual absl::StatusOr<int> GetBrightnessPercentImpl(absl::FunctionRef<bool()> cancel) = 0;
-  virtual absl::Status SetBrightnessPercentImpl(int percent, absl::FunctionRef<bool()> cancel) = 0;
+  virtual absl::StatusOr<int> GetBrightnessPercentImpl(
+      absl::FunctionRef<bool()> cancel) = 0;
+  virtual absl::Status SetBrightnessPercentImpl(
+      int percent, absl::FunctionRef<bool()> cancel) = 0;
 
   std::string name_;
   std::optional<int> cached_brightness_percent_;

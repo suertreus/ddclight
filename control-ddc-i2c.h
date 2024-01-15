@@ -5,9 +5,7 @@
 #include <absl/status/statusor.h>
 #include <absl/strings/string_view.h>
 #include <absl/types/span.h>
-
 #include <cstddef>
-#include <cstdint>
 #include <optional>
 #include <string>
 #include <utility>
@@ -18,7 +16,8 @@
 namespace jjaro {
 class I2CDDCControl : public Control {
  public:
-  static absl::StatusOr<std::optional<I2CDDCControl>> Probe(absl::string_view output, absl::string_view output_dir);
+  static absl::StatusOr<std::optional<I2CDDCControl>> Probe(
+      absl::string_view output, absl::string_view output_dir);
   I2CDDCControl(I2CDDCControl &&) = default;
   I2CDDCControl &operator=(I2CDDCControl &&) = default;
   ~I2CDDCControl() override = default;
@@ -26,8 +25,10 @@ class I2CDDCControl : public Control {
  private:
   I2CDDCControl(std::string dev, FDHolder fd)
       : Control(std::move(dev)), fd_(std::move(fd)) {}
-  absl::StatusOr<int> GetBrightnessPercentImpl(absl::FunctionRef<bool()> cancel) override;
-  absl::Status SetBrightnessPercentImpl(int percent, absl::FunctionRef<bool()> cancel) override;
+  absl::StatusOr<int> GetBrightnessPercentImpl(
+      absl::FunctionRef<bool()> cancel) override;
+  absl::Status SetBrightnessPercentImpl(
+      int percent, absl::FunctionRef<bool()> cancel) override;
   absl::Status TryWrite(absl::Span<const std::byte> buf,
                         absl::string_view error);
   absl::Status TryRead(absl::Span<std::byte> buf, absl::string_view error);

@@ -3,31 +3,14 @@
 #include <absl/functional/function_ref.h>
 #include <absl/status/status.h>
 #include <absl/status/statusor.h>
-#include <absl/strings/numbers.h>
-#include <absl/strings/str_cat.h>
 #include <absl/strings/str_format.h>
-#include <absl/strings/string_view.h>
-#include <absl/strings/strip.h>
 #include <absl/synchronization/mutex.h>
-#include <dirent.h>
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <sys/sysmacros.h>
-#include <sys/types.h>
-#include <unistd.h>
 #include <wayland-util.h>
-
 #include <algorithm>
-#include <array>
-#include <cerrno>
 #include <cstdio>
-#include <cstring>
-#include <limits>
 #include <optional>
 #include <tuple>
 #include <utility>
-
-#include "control-ddc-i2c.h"
 
 namespace jjaro {
 Output::Output(State *state, const Enumerator *enumerator, uint32_t name,

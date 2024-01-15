@@ -1,9 +1,10 @@
 #include "fd-holder.h"
 
-#include <cerrno>
 #include <absl/status/status.h>
 #include <absl/status/statusor.h>
 #include <unistd.h>
+
+#include <cerrno>
 
 namespace jjaro {
 absl::StatusOr<FDHolder> FDHolder::Dup(int fd) {
@@ -36,7 +37,8 @@ absl::Status FDHolder::Close() {
   if (fd_ == -1) return absl::OkStatus();
   while (true) {
     const int ret = close(fd_);
-    if (ret && errno != EINTR) return absl::ErrnoToStatus(errno, "failed to close fd");
+    if (ret && errno != EINTR)
+      return absl::ErrnoToStatus(errno, "failed to close fd");
 #ifndef __linux__
     // On Linux, the descriptor is closed even when `EINTR` is returned.
     if (!ret)
@@ -46,7 +48,5 @@ absl::Status FDHolder::Close() {
   fd_ = -1;
   return absl::OkStatus();
 }
-absl::StatusOr<FDHolder> FDHolder::Dup() const {
-  return Dup(fd_);
-}
+absl::StatusOr<FDHolder> FDHolder::Dup() const { return Dup(fd_); }
 }  // namespace jjaro

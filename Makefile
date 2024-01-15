@@ -7,10 +7,10 @@ CXXFLAGS+=-Wno-subobject-linkage -Wno-ignored-attributes -Wno-unknown-warning-op
 all: ddclight
 
 format: $(HDRS) $(SRCS)
-	clang-format -i --style=Google $^
+	echo clang-format -i --style=Google $^
 
 iwyu: $(SRCS)
-	include-what-you-use -Xiwyu --no_comments -Xiwyu --no_fwd_decls -std=c++17 `pkg-config --cflags $(DEPS)` $^
+	for f in $^ ; do include-what-you-use -Xiwyu --no_comments -Xiwyu --no_fwd_decls -std=c++17 `pkg-config --cflags $(DEPS)` $$f ; done
 
 %-client-glue.h: %.xml
 	sdbus-c++-xml2cpp $^ --proxy=$@

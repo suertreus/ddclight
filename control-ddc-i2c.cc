@@ -2,31 +2,34 @@
 
 #include <absl/functional/function_ref.h>
 #include <absl/status/status.h>
-#include <dirent.h>
 #include <absl/status/statusor.h>
 #include <absl/strings/str_cat.h>
-#include <absl/strings/strip.h>
 #include <absl/strings/string_view.h>
+#include <absl/strings/ascii.h>
+#include <absl/strings/match.h>
+#include <absl/strings/numbers.h>
+#include <cstdint>
+#include <memory>
 #include <absl/time/clock.h>
 #include <absl/time/time.h>
 #include <absl/types/span.h>
+#include <dirent.h>
 #include <fcntl.h>
 #include <linux/i2c-dev.h>
 #include <sys/ioctl.h>
-#include <unistd.h>
+#include <sys/stat.h>
 #include <sys/sysmacros.h>
 #include <sys/types.h>
+#include <unistd.h>
 #include <array>
-#include <sys/stat.h>
 #include <cerrno>
 #include <cstddef>
-#include <cstring>
-#include <string>
 #include <list>
+#include <string>
 
+#include "deleter.h"
 #include "fd-holder.h"
 #include "misc.h"
-#include "deleter.h"
 
 namespace jjaro {
 namespace {
@@ -55,17 +58,21 @@ absl::StatusOr<dev_t> ReadDev(int fd) {
     if (rret < 0 && errno == EINTR) continue;
     if (rret < 0) return absl::ErrnoToStatus(errno, "read failed");
     if (rret == buf.size()) return absl::InternalError("long read");
-    const auto dev_str = absl::StripAsciiWhitespace(absl::string_view(buf.data(), rret));
+    const auto dev_str =
+        absl::StripAsciiWhitespace(absl::string_view(buf.data(), rret));
     const size_t colon = dev_str.find(':');
-    if (colon == dev_str.npos) return absl::InternalError(
-absl::StrCat("unrecognized dev value: \"", dev_str, "\""));
+    if (colon == dev_str.npos)
+      return absl::InternalError(
+          absl::StrCat("unrecognized dev value: \"", dev_str, "\""));
     unsigned int maj, min;
     const auto maj_str = dev_str.substr(0, colon);
-    if (!absl::SimpleAtoi(maj_str, &maj)) return absl::InternalError(
-absl::StrCat("unrecognized major value: \"", maj_str, "\""));
+    if (!absl::SimpleAtoi(maj_str, &maj))
+      return absl::InternalError(
+          absl::StrCat("unrecognized major value: \"", maj_str, "\""));
     const auto min_str = dev_str.substr(colon + 1);
-    if (!absl::SimpleAtoi(min_str, &min)) return absl::InternalError(
-absl::StrCat("unrecognized minor value: \"", min_str, "\""));
+    if (!absl::SimpleAtoi(min_str, &min))
+      return absl::InternalError(
+          absl::StrCat("unrecognized minor value: \"", min_str, "\""));
     return makedev(maj, min);
   }
 }
@@ -83,13 +90,15 @@ absl::StatusOr<dev_t> StatDev(int fd) {
 }
 }  // namespace
 
-absl::StatusOr<std::optional<I2CDDCControl>> I2CDDCControl::Probe(const absl::string_view output, const absl::string_view output_dir) {
+absl::StatusOr<std::optional<I2CDDCControl>> I2CDDCControl::Probe(
+    const absl::string_view output, const absl::string_view output_dir) {
   std::unique_ptr<DIR, Deleter<closedir>> output_dirp;
   while (true) {
     output_dirp.reset(opendir(std::string(output_dir).c_str()));
     if (!output_dirp && errno == EINTR) continue;
     if (!output_dirp)
-      return absl::ErrnoToStatus(errno, absl::StrCat("opendir failed for ", output));
+      return absl::ErrnoToStatus(errno,
+                                 absl::StrCat("opendir failed for ", output));
     break;
   }
   std::list<std::pair<absl::string_view, std::string>> devs;
@@ -99,18 +108,22 @@ absl::StatusOr<std::optional<I2CDDCControl>> I2CDDCControl::Probe(const absl::st
     if (!ent && errno == EINTR) continue;
     if (!ent && errno)
       return absl::ErrnoToStatus(errno,
-            absl::StrCat("readdir failed for ", output));
+                                 absl::StrCat("readdir failed for ", output));
     if (!ent) break;
     if (ent->d_type != DT_DIR && ent->d_type != DT_LNK) continue;
     if (absl::string_view(ent->d_name) == "ddc") {
       auto link = Readlink(absl::StrCat(output_dir, "/", ent->d_name).c_str());
-      if (!link.ok()) return absl::Status(link.status().code(), absl::StrCat(output, " ddc: ", link.status().message()));
+      if (!link.ok())
+        return absl::Status(
+            link.status().code(),
+            absl::StrCat(output, " ddc: ", link.status().message()));
       if (*link) {
         const size_t slash = (*link)->rfind('/');
         if (slash == (*link)->npos) {
           devs.emplace_front("ddc", **std::move(link));
         } else {
-          devs.emplace_front("ddc", absl::string_view(**link).substr(slash + 1));
+          devs.emplace_front("ddc",
+                             absl::string_view(**link).substr(slash + 1));
         }
       }
     }
@@ -121,31 +134,49 @@ absl::StatusOr<std::optional<I2CDDCControl>> I2CDDCControl::Probe(const absl::st
   }
   if (devs.empty()) return std::nullopt;
   for (auto &devp : devs) {
-    const auto dev_nums_fd = Open(absl::StrCat(output_dir, "/", devp.first, "/i2c-dev/", devp.second, "/dev").c_str(), O_RDONLY);
+    const auto dev_nums_fd = Open(absl::StrCat(output_dir, "/", devp.first,
+                                               "/i2c-dev/", devp.second, "/dev")
+                                      .c_str(),
+                                  O_RDONLY);
     if (!dev_nums_fd.ok())
-return absl::Status(dev_nums_fd.status().code(),
-absl::StrCat(output, " ", devp.second, " could not read device number from sysfs: ", dev_nums_fd.status().message()));
+      return absl::Status(
+          dev_nums_fd.status().code(),
+          absl::StrCat(output, " ", devp.second,
+                       " could not read device number from sysfs: ",
+                       dev_nums_fd.status().message()));
     const auto sysfs_dev_nums = ReadDev(dev_nums_fd->get());
     if (!sysfs_dev_nums.ok())
-return absl::Status(sysfs_dev_nums.status().code(),
-absl::StrCat(output, " ", devp.second, " could not read device number from sysfs: ", sysfs_dev_nums.status().message()));
+      return absl::Status(
+          sysfs_dev_nums.status().code(),
+          absl::StrCat(output, " ", devp.second,
+                       " could not read device number from sysfs: ",
+                       sysfs_dev_nums.status().message()));
     auto dev_fd = Open(absl::StrCat("/dev/", devp.second).c_str(), O_RDWR);
     const auto devfs_dev_nums = StatDev(dev_fd->get());
     if (!devfs_dev_nums.ok())
-return absl::Status(devfs_dev_nums.status().code(),
-absl::StrCat(output, " ", devp.second, " could not read device number from sysfs: ", devfs_dev_nums.status().message()));
+      return absl::Status(
+          devfs_dev_nums.status().code(),
+          absl::StrCat(output, " ", devp.second,
+                       " could not read device number from sysfs: ",
+                       devfs_dev_nums.status().message()));
     if (*sysfs_dev_nums != *devfs_dev_nums)
-      return absl::InternalError(absl::StrCat("/dev/", devp.second, " device number ", major(*devfs_dev_nums), ":", minor(*devfs_dev_nums), " doesn't match sysfs ", major(*sysfs_dev_nums), ":", minor(*sysfs_dev_nums)));
+      return absl::InternalError(absl::StrCat(
+          "/dev/", devp.second, " device number ", major(*devfs_dev_nums), ":",
+          minor(*devfs_dev_nums), " doesn't match sysfs ",
+          major(*sysfs_dev_nums), ":", minor(*sysfs_dev_nums)));
     while (true) {
       const int ret = ioctl(dev_fd->get(), I2C_SLAVE, kDeviceBusAddr);
       if (ret != 0 && errno == EINTR) continue;
-      if (ret != 0) return absl::ErrnoToStatus(errno,
-absl::StrCat(output, " ", devp.second, " failed to set I2C_SLAVE address 0x", absl::Hex(kDeviceBusAddr)));
+      if (ret != 0)
+        return absl::ErrnoToStatus(
+            errno, absl::StrCat(output, " ", devp.second,
+                                " failed to set I2C_SLAVE address 0x",
+                                absl::Hex(kDeviceBusAddr)));
       break;
     }
-    if (
-    I2CDDCControl ddc(std::move(devp.second), *std::move(dev_fd));
-ddc.GetBrightnessPercent().ok()) return ddc;
+    if (I2CDDCControl ddc(std::move(devp.second), *std::move(dev_fd));
+        ddc.GetBrightnessPercent().ok())
+      return ddc;
   }
   return std::nullopt;
 }
@@ -182,8 +213,8 @@ absl::StatusOr<int> I2CDDCControl::GetBrightnessPercentImpl(
   return 100 * brightness / max_brightness_;
 }
 
-absl::Status I2CDDCControl::SetBrightnessPercentImpl(int percent,
-                                             absl::FunctionRef<bool()> cancel) {
+absl::Status I2CDDCControl::SetBrightnessPercentImpl(
+    int percent, absl::FunctionRef<bool()> cancel) {
   const auto error = absl::StrCat("SetBrightness ", name());
   uint16_t val = percent * max_brightness_ / 100;
   std::array<std::byte, 8> req{kDeviceWriteAddr,
@@ -205,35 +236,31 @@ absl::Status I2CDDCControl::SetBrightnessPercentImpl(int percent,
 }
 
 absl::Status I2CDDCControl::TryWrite(absl::Span<const std::byte> buf,
-                                 absl::string_view error) {
+                                     absl::string_view error) {
   while (true) {
     const ssize_t wret = write(fd_.get(), buf.data(), buf.size());
     if (wret < 0 && errno == EINTR) continue;
     if (wret < 0)
-      return absl::ErrnoToStatus(errno,
-          absl::StrCat(error, " write failed"));
+      return absl::ErrnoToStatus(errno, absl::StrCat(error, " write failed"));
     if (wret != static_cast<ssize_t>(buf.size()))
-      return absl::ErrnoToStatus(errno,
-          absl::StrCat(error, " short write"));
+      return absl::ErrnoToStatus(errno, absl::StrCat(error, " short write"));
     return absl::OkStatus();
   }
 }
 absl::Status I2CDDCControl::TryRead(absl::Span<std::byte> buf,
-                                absl::string_view error) {
+                                    absl::string_view error) {
   while (true) {
     const ssize_t rret = read(fd_.get(), buf.data(), buf.size());
     if (rret < 0 && errno == EINTR) continue;
     if (rret < 0)
-      return absl::ErrnoToStatus(errno,
-          absl::StrCat(error, " read failed"));
+      return absl::ErrnoToStatus(errno, absl::StrCat(error, " read failed"));
     if (rret != static_cast<ssize_t>(buf.size()))
-      return absl::ErrnoToStatus(errno,
-          absl::StrCat(error, " short read"));
+      return absl::ErrnoToStatus(errno, absl::StrCat(error, " short read"));
     return absl::OkStatus();
   }
 }
-absl::Status I2CDDCControl::ValidateBrightnessResp(absl::Span<const std::byte> buf,
-                                               absl::string_view error) {
+absl::Status I2CDDCControl::ValidateBrightnessResp(
+    absl::Span<const std::byte> buf, absl::string_view error) {
   if (buf[1] != kDeviceWriteAddr)
     return absl::InternalError(absl::StrCat(
         error, " unexpected source address 0x", absl::Hex(buf[1])));

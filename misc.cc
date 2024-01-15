@@ -1,15 +1,14 @@
 #include "misc.h"
 
-#include <fcntl.h>
 #include <absl/status/status.h>
 #include <absl/status/statusor.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include <cerrno>
 #include <optional>
 #include <string>
-#include <sys/types.h>
 
 #include "fd-holder.h"
-
 
 namespace jjaro {
 absl::StatusOr<FDHolder> Open(const char *pathname, int flags) {
@@ -26,8 +25,7 @@ absl::StatusOr<std::optional<std::string>> Readlink(const char *pathname) {
     const ssize_t ret = readlink(pathname, buf.data(), buf.size());
     if (ret < 0 && errno == EINTR) continue;
     if (ret < 0 && errno == ENOENT) return std::nullopt;
-    if (ret < 0)
-      return absl::ErrnoToStatus(errno, "readlinkat failed");
+    if (ret < 0) return absl::ErrnoToStatus(errno, "readlinkat failed");
     if (ret < buf.size()) {
       buf.resize(ret);
       return buf;
