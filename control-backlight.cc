@@ -72,7 +72,7 @@ absl::StatusOr<std::optional<BacklightControl>> BacklightControl::Probe(
     if (!ent) return std::nullopt;
     if (ent->d_type != DT_DIR) continue;
     if (const auto link = Readlink(
-            absl::StrCat(output_dir, "/", ent->d_name, "/subsystem").c_str());
+            absl::StrCat(output_dir, "/", ent->d_name, "/subsystem"));
         !link.ok()) {
       return absl::Status(link.status().code(),
                           absl::StrCat(output, " ", ent->d_name, "/subsystem ",
@@ -81,7 +81,7 @@ absl::StatusOr<std::optional<BacklightControl>> BacklightControl::Probe(
       continue;
     }
     const auto max_brightness_fd = Open(
-        absl::StrCat(output_dir, "/", ent->d_name, "/max_brightness").c_str(),
+        absl::StrCat(output_dir, "/", ent->d_name, "/max_brightness"),
         O_RDONLY);
     if (!max_brightness_fd.ok())
       return absl::Status(
@@ -95,15 +95,14 @@ absl::StatusOr<std::optional<BacklightControl>> BacklightControl::Probe(
           absl::StrCat("couldn't get ", output, " ", ent->d_name,
                        "/max_brightness: ", max_brightness.status().message()));
     auto brightness_fd =
-        Open(absl::StrCat(output_dir, "/", ent->d_name, "/brightness").c_str(),
+        Open(absl::StrCat(output_dir, "/", ent->d_name, "/brightness"),
              O_WRONLY);
     if (!brightness_fd.ok())
       return absl::Status(brightness_fd.status().code(),
                           absl::StrCat(output, " ", ent->d_name, "/brightness ",
                                        brightness_fd.status().message()));
     auto actual_brightness_fd =
-        Open(absl::StrCat(output_dir, "/", ent->d_name, "/actual_brightness")
-                 .c_str(),
+        Open(absl::StrCat(output_dir, "/", ent->d_name, "/actual_brightness"),
              O_RDONLY);
     if (!actual_brightness_fd.ok())
       return absl::Status(

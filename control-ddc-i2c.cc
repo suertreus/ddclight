@@ -9,6 +9,7 @@
 #include <absl/strings/match.h>
 #include <absl/strings/numbers.h>
 #include <cstdint>
+#include <cstring>
 #include <memory>
 #include <absl/time/clock.h>
 #include <absl/time/time.h>
@@ -16,6 +17,7 @@
 #include <dirent.h>
 #include <fcntl.h>
 #include <linux/i2c-dev.h>
+#include <linux/i2c.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
@@ -77,6 +79,17 @@ absl::StatusOr<dev_t> ReadDev(int fd) {
   }
 }
 
+absl::StatusOr<std::string> ReadStr(int fd, size_t max_size) {
+  std::string buf(max_size, '0');
+  while (true) {
+    const ssize_t rret = read(fd, buf.data(), buf.size());
+    if (rret < 0 && errno == EINTR) continue;
+    if (rret < 0) return absl::ErrnoToStatus(errno, "read failed");
+    buf.resize(rret);
+    return buf;
+  }
+}
+
 absl::StatusOr<dev_t> StatDev(int fd) {
   struct stat statbuf;
   while (true) {
@@ -92,6 +105,18 @@ absl::StatusOr<dev_t> StatDev(int fd) {
 
 absl::StatusOr<std::optional<I2CDDCControl>> I2CDDCControl::Probe(
     const absl::string_view output, const absl::string_view output_dir) {
+const auto edid_fd = Open(absl::StrCat(output_dir, "/edid"), O_RDONLY);
+    if (!edid_fd.ok())
+      return absl::Status(
+          edid_fd.status().code(),
+          absl::StrCat(output, " could not read EDID from sysfs: ",
+                       edid_fd.status().message()));
+const auto sysfs_edid = ReadStr(edid_fd->get(), 128);
+    if (!sysfs_edid.ok())
+      return absl::Status(
+          sysfs_edid.status().code(),
+          absl::StrCat(output, " could not read EDID from sysfs: ",
+                       sysfs_edid.status().message()));
   std::unique_ptr<DIR, Deleter<closedir>> output_dirp;
   while (true) {
     output_dirp.reset(opendir(std::string(output_dir).c_str()));
@@ -101,7 +126,7 @@ absl::StatusOr<std::optional<I2CDDCControl>> I2CDDCControl::Probe(
                                  absl::StrCat("opendir failed for ", output));
     break;
   }
-  std::list<std::pair<absl::string_view, std::string>> devs;
+  std::list<std::pair<std::string, std::string>> devs;
   while (true) {
     errno = 0;
     const struct dirent *const ent = readdir(output_dirp.get());
@@ -112,7 +137,8 @@ absl::StatusOr<std::optional<I2CDDCControl>> I2CDDCControl::Probe(
     if (!ent) break;
     if (ent->d_type != DT_DIR && ent->d_type != DT_LNK) continue;
     if (absl::string_view(ent->d_name) == "ddc") {
-      auto link = Readlink(absl::StrCat(output_dir, "/", ent->d_name).c_str());
+      std::string link_path = absl::StrCat(output_dir, "/ddc");
+      auto link = Readlink(link_path);
       if (!link.ok())
         return absl::Status(
             link.status().code(),
@@ -120,23 +146,46 @@ absl::StatusOr<std::optional<I2CDDCControl>> I2CDDCControl::Probe(
       if (*link) {
         const size_t slash = (*link)->rfind('/');
         if (slash == (*link)->npos) {
-          devs.emplace_front("ddc", **std::move(link));
+          devs.emplace_front(std::move(link_path), **std::move(link));
         } else {
-          devs.emplace_front("ddc",
-                             absl::string_view(**link).substr(slash + 1));
+          devs.emplace_front(std::move(link_path), absl::string_view(**link).substr(slash + 1));
         }
       }
     }
-    if (absl::StartsWith(ent->d_name, "i2c")) {
-      auto &p = devs.emplace_back("", ent->d_name);
-      p.first = p.second;
+    if (absl::StartsWith(ent->d_name, "i2c-")) {
+      devs.emplace_back(absl::StrCat(output_dir, "/", ent->d_name), ent->d_name);
     }
   }
-  if (devs.empty()) return std::nullopt;
+  if (devs.empty()) {
+    std::unique_ptr<DIR, Deleter<closedir>> card_device_dirp;
+    while (true) {
+      card_device_dirp.reset(opendir(absl::StrCat(output_dir, "/device/device").c_str()));
+      if (!card_device_dirp && errno == EINTR) continue;
+      if (!card_device_dirp)
+        return absl::ErrnoToStatus(errno,
+                                   absl::StrCat("opendir failed for card for ", output));
+      break;
+    }
+    while (true) {
+      errno = 0;
+      const struct dirent *const ent = readdir(card_device_dirp.get());
+      if (!ent && errno == EINTR) continue;
+      if (!ent && errno)
+        return absl::ErrnoToStatus(errno,
+                                   absl::StrCat("readdir failed for ", output));
+      if (!ent) break;
+      if (ent->d_type != DT_DIR) continue;
+      if (!absl::StartsWith(ent->d_name, "i2c-")) continue;
+      auto name_fd = Open(absl::StrCat(output_dir, "/device/device/", ent->d_name, "/name"), O_RDONLY);
+      if (!name_fd.ok()) continue;
+      auto name = ReadStr(name_fd->get(), 64);
+      if (!name.ok()) continue;
+      if (absl::StripAsciiWhitespace(*name) != "DPMST") continue;
+      devs.emplace_back(absl::StrCat(output_dir, "/device/device/", ent->d_name), ent->d_name);
+    }
+  }
   for (auto &devp : devs) {
-    const auto dev_nums_fd = Open(absl::StrCat(output_dir, "/", devp.first,
-                                               "/i2c-dev/", devp.second, "/dev")
-                                      .c_str(),
+    const auto dev_nums_fd = Open(absl::StrCat(devp.first, "/i2c-dev/", devp.second, "/dev"),
                                   O_RDONLY);
     if (!dev_nums_fd.ok())
       return absl::Status(
@@ -151,7 +200,7 @@ absl::StatusOr<std::optional<I2CDDCControl>> I2CDDCControl::Probe(
           absl::StrCat(output, " ", devp.second,
                        " could not read device number from sysfs: ",
                        sysfs_dev_nums.status().message()));
-    auto dev_fd = Open(absl::StrCat("/dev/", devp.second).c_str(), O_RDWR);
+    auto dev_fd = Open(absl::StrCat("/dev/", devp.second), O_RDWR);
     const auto devfs_dev_nums = StatDev(dev_fd->get());
     if (!devfs_dev_nums.ok())
       return absl::Status(
@@ -164,6 +213,10 @@ absl::StatusOr<std::optional<I2CDDCControl>> I2CDDCControl::Probe(
           "/dev/", devp.second, " device number ", major(*devfs_dev_nums), ":",
           minor(*devfs_dev_nums), " doesn't match sysfs ",
           major(*sysfs_dev_nums), ":", minor(*sysfs_dev_nums)));
+    const auto ddc_edid = I2CDDCControl::ReadEDID(dev_fd->get());
+    if (!ddc_edid.ok()) return absl::Status(ddc_edid.status().code(),
+absl::StrCat(output, " ", devp.second, " failed to read EDID: ", ddc_edid.status().message()));
+    if (*sysfs_edid != *ddc_edid) continue;
     while (true) {
       const int ret = ioctl(dev_fd->get(), I2C_SLAVE, kDeviceBusAddr);
       if (ret != 0 && errno == EINTR) continue;
@@ -284,5 +337,36 @@ absl::Status I2CDDCControl::ValidateBrightnessResp(
   if (Checksum(buf) != std::byte{0})
     return absl::InternalError(absl::StrCat(error, " bad resp checksum"));
   return absl::OkStatus();
+}
+
+absl::StatusOr<std::string> I2CDDCControl::ReadEDID(int fd) {
+  while (true) {
+    const int ret = ioctl(fd, I2C_SLAVE, kHostReadAddr);
+    if (ret != 0 && errno == EINTR) continue;
+    if (ret != 0)
+      return absl::ErrnoToStatus(
+          errno, absl::StrCat("failed to set I2C_SLAVE address 0x",
+                              absl::Hex(kHostReadAddr)));
+    break;
+  }
+  std::string buf(128, '0');
+  struct i2c_smbus_ioctl_data args;
+  memset(&args, 0, sizeof(args));
+  args.read_write = I2C_SMBUS_READ;
+  args.size = I2C_SMBUS_BYTE_DATA;
+  union i2c_smbus_data data;
+  args.data = &data;
+  for (size_t i = 0; i < buf.size(); i++) {
+    args.command = i;
+    while (true) {
+      const int ret = ioctl(fd, I2C_SMBUS, &args);
+      if (ret != 0 && errno == EINTR) continue;
+      if (ret != 0)
+        return absl::ErrnoToStatus(errno, "SMBus read failed");
+      buf[i] = data.byte;
+      break;
+    }
+  }
+  return buf;
 }
 }  // namespace jjaro

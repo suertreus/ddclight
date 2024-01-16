@@ -141,7 +141,7 @@ void Output::HandleDone(void *output, struct wl_output *) {
       that->cancel_.store(false, std::memory_order_relaxed);
     }
     that->thread_.emplace(ThreadLoop, that);
-    absl::FPrintF(stderr, "Watching DDC devnode for output %s (%s:%s) %s.\n",
+    absl::FPrintF(stderr, "Watching controls for output %s (%s:%s) %s.\n",
                   that->name_, that->make_, that->model_,
                   that->control_->name());
   } else {

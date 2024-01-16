@@ -34,6 +34,7 @@ class I2CDDCControl : public Control {
   absl::Status TryRead(absl::Span<std::byte> buf, absl::string_view error);
   static absl::Status ValidateBrightnessResp(absl::Span<const std::byte> buf,
                                              absl::string_view error);
+  static absl::StatusOr<std::string> ReadEDID(int fd);
 
   FDHolder fd_;
   int max_brightness_;

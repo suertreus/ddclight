@@ -5,6 +5,11 @@ Factor Enumeration out into an interface or two, and add implementations
   Non-graphical session support
     https://www.freedesktop.org/wiki/Software/systemd/logind
   Just do all the outputs
-Confirm DP MST support
-Per-make/model configuration/trim of brightness curves
+Per-make/model configuration
+  Trim brightness curves
+  Manually assign controls
+Push/pop support in protocol
 libappindicator support?
+Do enumeration on multiple threads to startup faster
+  Avoid reading EDID from non-MST I2Cs
+  Cache	EDID reads from	I2C to avoid re-reads when searching for multiple MSTs
