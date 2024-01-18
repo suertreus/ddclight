@@ -147,7 +147,7 @@ void Output::HandleDone(void *output, struct wl_output *) {
                   that->control_->name());
   } else {
     absl::FPrintF(stderr,
-                  "Failed to infer DDC devnode for output %s (%s:%s); won't "
+                  "Failed to find brightness control for output %s (%s:%s); won't "
                   "adjust: %s.\n",
                   that->name_, that->make_, that->model_,
                   ctrl.status().ToString());
