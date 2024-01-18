@@ -30,6 +30,7 @@ void DDCLight::RemoveOutput(uint32_t name) {
   for (auto it = outputs_.cbegin(); it != outputs_.cend(); ++it) {
     if (it->wayland_name() != name) continue;
     outputs_.erase(it);
+    return;
   }
 }
 
