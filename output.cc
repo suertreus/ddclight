@@ -146,11 +146,11 @@ void Output::HandleDone(void *output, struct wl_output *) {
                   that->name_, that->make_, that->model_,
                   that->control_->name());
   } else {
-    absl::FPrintF(stderr,
-                  "Failed to find brightness control for output %s (%s:%s); won't "
-                  "adjust: %s.\n",
-                  that->name_, that->make_, that->model_,
-                  ctrl.status().ToString());
+    absl::FPrintF(
+        stderr,
+        "Failed to find brightness control for output %s (%s:%s); won't "
+        "adjust: %s.\n",
+        that->name_, that->make_, that->model_, ctrl.status().ToString());
     that->control_.reset();
     that->thread_.reset();
   }

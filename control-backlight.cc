@@ -81,7 +81,8 @@ absl::StatusOr<std::optional<BacklightControl>> BacklightControl::Probe(
     } else if (!*link || !absl::EndsWith(**link, "/class/backlight")) {
       continue;
     }
-    if (auto dev = ProbeDevice(output, ent->d_name); !dev.ok() || *dev) return dev;
+    if (auto dev = ProbeDevice(output, ent->d_name); !dev.ok() || *dev)
+      return dev;
   }
 }
 
@@ -104,17 +105,18 @@ absl::StatusOr<std::optional<BacklightControl>> BacklightControl::ProbeDevice(
   auto brightness_fd = Open(
       absl::StrCat("/sys/class/backlight/", device, "/brightness"), O_WRONLY);
   if (!brightness_fd.ok())
-    return absl::Status(brightness_fd.status().code(),
-                        absl::StrCat("couldn't get ", output, " ", device, "/brightness ",
-                                     brightness_fd.status().message()));
+    return absl::Status(
+        brightness_fd.status().code(),
+        absl::StrCat("couldn't get ", output, " ", device, "/brightness ",
+                     brightness_fd.status().message()));
   auto actual_brightness_fd =
       Open(absl::StrCat("/sys/class/backlight/", device, "/actual_brightness"),
            O_RDONLY);
   if (!actual_brightness_fd.ok())
-    return absl::Status(
-        actual_brightness_fd.status().code(),
-        absl::StrCat("couldn't get ", output, " ", device, "/actual_brightness ",
-                     actual_brightness_fd.status().message()));
+    return absl::Status(actual_brightness_fd.status().code(),
+                        absl::StrCat("couldn't get ", output, " ", device,
+                                     "/actual_brightness ",
+                                     actual_brightness_fd.status().message()));
   return BacklightControl(std::string(device), *std::move(brightness_fd),
                           *std::move(actual_brightness_fd), *max_brightness);
 }

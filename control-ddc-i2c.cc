@@ -26,9 +26,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <list>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "deleter.h"
 #include "fd-holder.h"
@@ -135,8 +135,10 @@ absl::StatusOr<std::optional<I2CDDCControl>> I2CDDCControl::Probe(
             absl::StrCat(output, " ddc: ", link.status().message()));
       if (*link) {
         absl::string_view device = **link;
-        if (const size_t slash = device.rfind('/'); slash != device.npos) device = device.substr(slash + 1);
-        if (auto dev = ProbeDevice(output, device); !dev.ok() || *dev) return dev;
+        if (const size_t slash = device.rfind('/'); slash != device.npos)
+          device = device.substr(slash + 1);
+        if (auto dev = ProbeDevice(output, device); !dev.ok() || *dev)
+          return dev;
       }
     }
     if (absl::StartsWith(ent->d_name, "i2c-")) {
@@ -180,21 +182,25 @@ absl::StatusOr<std::optional<I2CDDCControl>> I2CDDCControl::Probe(
     if (!ent) return std::nullopt;
     if (ent->d_type != DT_DIR) continue;
     if (!absl::StartsWith(ent->d_name, "i2c-")) continue;
-    auto name_fd = Open(
-        absl::StrCat(output_dir, "/device/device/", ent->d_name, "/name"),
-        O_RDONLY);
+    auto name_fd =
+        Open(absl::StrCat(output_dir, "/device/device/", ent->d_name, "/name"),
+             O_RDONLY);
     if (!name_fd.ok()) continue;
     auto name = ReadStr(name_fd->get(), 64);
     if (!name.ok()) continue;
     if (absl::StripAsciiWhitespace(*name) != "DPMST") continue;
-    if (auto dev = ProbeDevice(output, ent->d_name, *sysfs_edid); !dev.ok() || *dev) return dev;
+    if (auto dev = ProbeDevice(output, ent->d_name, *sysfs_edid);
+        !dev.ok() || *dev)
+      return dev;
   }
 }
 
 absl::StatusOr<std::optional<I2CDDCControl>> I2CDDCControl::ProbeDevice(
-    const absl::string_view output, const absl::string_view device, const absl::string_view match_edid) {
-  const auto dev_nums_fd = Open(
-      absl::StrCat("/sys/bus/i2c/devices/", device, "/i2c-dev/", device, "/dev"), O_RDONLY);
+    const absl::string_view output, const absl::string_view device,
+    const absl::string_view match_edid) {
+  const auto dev_nums_fd = Open(absl::StrCat("/sys/bus/i2c/devices/", device,
+                                             "/i2c-dev/", device, "/dev"),
+                                O_RDONLY);
   if (!dev_nums_fd.ok())
     return absl::Status(
         dev_nums_fd.status().code(),
@@ -217,10 +223,10 @@ absl::StatusOr<std::optional<I2CDDCControl>> I2CDDCControl::ProbeDevice(
                      " could not read device number from sysfs: ",
                      devfs_dev_nums.status().message()));
   if (*sysfs_dev_nums != *devfs_dev_nums)
-    return absl::InternalError(absl::StrCat(
-        "/dev/", device, " device number ", major(*devfs_dev_nums), ":",
-        minor(*devfs_dev_nums), " doesn't match sysfs ",
-        major(*sysfs_dev_nums), ":", minor(*sysfs_dev_nums)));
+    return absl::InternalError(
+        absl::StrCat("/dev/", device, " device number ", major(*devfs_dev_nums),
+                     ":", minor(*devfs_dev_nums), " doesn't match sysfs ",
+                     major(*sysfs_dev_nums), ":", minor(*sysfs_dev_nums)));
   if (!match_edid.empty()) {
     const auto ddc_edid = I2CDDCControl::ReadEDID(dev_fd->get());
     if (!ddc_edid.ok())
