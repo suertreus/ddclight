@@ -7,7 +7,7 @@ CXXFLAGS+=-Wno-subobject-linkage -Wno-ignored-attributes -Wno-unknown-warning-op
 all: ddclight
 
 format: $(HDRS) $(SRCS)
-	echo clang-format -i --style=Google $^
+	clang-format -i --style=Google $^
 
 iwyu: $(SRCS)
 	for f in $^ ; do include-what-you-use -Xiwyu --no_comments -Xiwyu --no_fwd_decls -std=c++17 `pkg-config --cflags $(DEPS)` $$f ; done

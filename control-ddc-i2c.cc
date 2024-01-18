@@ -3,14 +3,11 @@
 #include <absl/functional/function_ref.h>
 #include <absl/status/status.h>
 #include <absl/status/statusor.h>
-#include <absl/strings/str_cat.h>
-#include <absl/strings/string_view.h>
 #include <absl/strings/ascii.h>
 #include <absl/strings/match.h>
 #include <absl/strings/numbers.h>
-#include <cstdint>
-#include <cstring>
-#include <memory>
+#include <absl/strings/str_cat.h>
+#include <absl/strings/string_view.h>
 #include <absl/time/clock.h>
 #include <absl/time/time.h>
 #include <absl/types/span.h>
@@ -23,10 +20,14 @@
 #include <sys/sysmacros.h>
 #include <sys/types.h>
 #include <unistd.h>
+
 #include <array>
 #include <cerrno>
 #include <cstddef>
+#include <cstdint>
+#include <cstring>
 #include <list>
+#include <memory>
 #include <string>
 
 #include "deleter.h"
@@ -105,18 +106,18 @@ absl::StatusOr<dev_t> StatDev(int fd) {
 
 absl::StatusOr<std::optional<I2CDDCControl>> I2CDDCControl::Probe(
     const absl::string_view output, const absl::string_view output_dir) {
-const auto edid_fd = Open(absl::StrCat(output_dir, "/edid"), O_RDONLY);
-    if (!edid_fd.ok())
-      return absl::Status(
-          edid_fd.status().code(),
-          absl::StrCat(output, " could not read EDID from sysfs: ",
-                       edid_fd.status().message()));
-const auto sysfs_edid = ReadStr(edid_fd->get(), 128);
-    if (!sysfs_edid.ok())
-      return absl::Status(
-          sysfs_edid.status().code(),
-          absl::StrCat(output, " could not read EDID from sysfs: ",
-                       sysfs_edid.status().message()));
+  const auto edid_fd = Open(absl::StrCat(output_dir, "/edid"), O_RDONLY);
+  if (!edid_fd.ok())
+    return absl::Status(
+        edid_fd.status().code(),
+        absl::StrCat(output, " could not read EDID from sysfs: ",
+                     edid_fd.status().message()));
+  const auto sysfs_edid = ReadStr(edid_fd->get(), 128);
+  if (!sysfs_edid.ok())
+    return absl::Status(
+        sysfs_edid.status().code(),
+        absl::StrCat(output, " could not read EDID from sysfs: ",
+                     sysfs_edid.status().message()));
   std::unique_ptr<DIR, Deleter<closedir>> output_dirp;
   while (true) {
     output_dirp.reset(opendir(std::string(output_dir).c_str()));
@@ -148,22 +149,25 @@ const auto sysfs_edid = ReadStr(edid_fd->get(), 128);
         if (slash == (*link)->npos) {
           devs.emplace_front(std::move(link_path), **std::move(link));
         } else {
-          devs.emplace_front(std::move(link_path), absl::string_view(**link).substr(slash + 1));
+          devs.emplace_front(std::move(link_path),
+                             absl::string_view(**link).substr(slash + 1));
         }
       }
     }
     if (absl::StartsWith(ent->d_name, "i2c-")) {
-      devs.emplace_back(absl::StrCat(output_dir, "/", ent->d_name), ent->d_name);
+      devs.emplace_back(absl::StrCat(output_dir, "/", ent->d_name),
+                        ent->d_name);
     }
   }
   if (devs.empty()) {
     std::unique_ptr<DIR, Deleter<closedir>> card_device_dirp;
     while (true) {
-      card_device_dirp.reset(opendir(absl::StrCat(output_dir, "/device/device").c_str()));
+      card_device_dirp.reset(
+          opendir(absl::StrCat(output_dir, "/device/device").c_str()));
       if (!card_device_dirp && errno == EINTR) continue;
       if (!card_device_dirp)
-        return absl::ErrnoToStatus(errno,
-                                   absl::StrCat("opendir failed for card for ", output));
+        return absl::ErrnoToStatus(
+            errno, absl::StrCat("opendir failed for card for ", output));
       break;
     }
     while (true) {
@@ -176,17 +180,21 @@ const auto sysfs_edid = ReadStr(edid_fd->get(), 128);
       if (!ent) break;
       if (ent->d_type != DT_DIR) continue;
       if (!absl::StartsWith(ent->d_name, "i2c-")) continue;
-      auto name_fd = Open(absl::StrCat(output_dir, "/device/device/", ent->d_name, "/name"), O_RDONLY);
+      auto name_fd = Open(
+          absl::StrCat(output_dir, "/device/device/", ent->d_name, "/name"),
+          O_RDONLY);
       if (!name_fd.ok()) continue;
       auto name = ReadStr(name_fd->get(), 64);
       if (!name.ok()) continue;
       if (absl::StripAsciiWhitespace(*name) != "DPMST") continue;
-      devs.emplace_back(absl::StrCat(output_dir, "/device/device/", ent->d_name), ent->d_name);
+      devs.emplace_back(
+          absl::StrCat(output_dir, "/device/device/", ent->d_name),
+          ent->d_name);
     }
   }
   for (auto &devp : devs) {
-    const auto dev_nums_fd = Open(absl::StrCat(devp.first, "/i2c-dev/", devp.second, "/dev"),
-                                  O_RDONLY);
+    const auto dev_nums_fd = Open(
+        absl::StrCat(devp.first, "/i2c-dev/", devp.second, "/dev"), O_RDONLY);
     if (!dev_nums_fd.ok())
       return absl::Status(
           dev_nums_fd.status().code(),
@@ -214,8 +222,11 @@ const auto sysfs_edid = ReadStr(edid_fd->get(), 128);
           minor(*devfs_dev_nums), " doesn't match sysfs ",
           major(*sysfs_dev_nums), ":", minor(*sysfs_dev_nums)));
     const auto ddc_edid = I2CDDCControl::ReadEDID(dev_fd->get());
-    if (!ddc_edid.ok()) return absl::Status(ddc_edid.status().code(),
-absl::StrCat(output, " ", devp.second, " failed to read EDID: ", ddc_edid.status().message()));
+    if (!ddc_edid.ok())
+      return absl::Status(
+          ddc_edid.status().code(),
+          absl::StrCat(output, " ", devp.second,
+                       " failed to read EDID: ", ddc_edid.status().message()));
     if (*sysfs_edid != *ddc_edid) continue;
     while (true) {
       const int ret = ioctl(dev_fd->get(), I2C_SLAVE, kDeviceBusAddr);
@@ -361,8 +372,7 @@ absl::StatusOr<std::string> I2CDDCControl::ReadEDID(int fd) {
     while (true) {
       const int ret = ioctl(fd, I2C_SMBUS, &args);
       if (ret != 0 && errno == EINTR) continue;
-      if (ret != 0)
-        return absl::ErrnoToStatus(errno, "SMBus read failed");
+      if (ret != 0) return absl::ErrnoToStatus(errno, "SMBus read failed");
       buf[i] = data.byte;
       break;
     }

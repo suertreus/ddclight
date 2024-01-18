@@ -4,6 +4,7 @@
 #include <absl/functional/any_invocable.h>
 #include <wayland-client-core.h>
 #include <wayland-client-protocol.h>
+
 #include <cstdint>
 #include <memory>
 #include <thread>

@@ -6,6 +6,7 @@
 #include <absl/strings/str_format.h>
 #include <absl/synchronization/mutex.h>
 #include <wayland-util.h>
+
 #include <algorithm>
 #include <cstdio>
 #include <optional>
