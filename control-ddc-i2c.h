@@ -19,6 +19,8 @@ class I2CDDCControl : public Control {
  public:
   static absl::StatusOr<std::optional<I2CDDCControl>> Probe(
       absl::string_view output, absl::string_view output_dir);
+  static absl::StatusOr<std::optional<I2CDDCControl>> ProbeDevice(
+      absl::string_view output, absl::string_view device, absl::string_view match_edid = "");
   I2CDDCControl(I2CDDCControl &&) = default;
   I2CDDCControl &operator=(I2CDDCControl &&) = default;
   ~I2CDDCControl() override = default;

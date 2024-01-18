@@ -106,18 +106,7 @@ absl::StatusOr<dev_t> StatDev(int fd) {
 
 absl::StatusOr<std::optional<I2CDDCControl>> I2CDDCControl::Probe(
     const absl::string_view output, const absl::string_view output_dir) {
-  const auto edid_fd = Open(absl::StrCat(output_dir, "/edid"), O_RDONLY);
-  if (!edid_fd.ok())
-    return absl::Status(
-        edid_fd.status().code(),
-        absl::StrCat(output, " could not read EDID from sysfs: ",
-                     edid_fd.status().message()));
-  const auto sysfs_edid = ReadStr(edid_fd->get(), 128);
-  if (!sysfs_edid.ok())
-    return absl::Status(
-        sysfs_edid.status().code(),
-        absl::StrCat(output, " could not read EDID from sysfs: ",
-                     sysfs_edid.status().message()));
+  // Try ${output}/ddc and collect ${output}/i2c-* to try next.
   std::unique_ptr<DIR, Deleter<closedir>> output_dirp;
   while (true) {
     output_dirp.reset(opendir(std::string(output_dir).c_str()));
@@ -127,7 +116,7 @@ absl::StatusOr<std::optional<I2CDDCControl>> I2CDDCControl::Probe(
                                  absl::StrCat("opendir failed for ", output));
     break;
   }
-  std::list<std::pair<std::string, std::string>> devs;
+  std::vector<std::string> devs;
   while (true) {
     errno = 0;
     const struct dirent *const ent = readdir(output_dirp.get());
@@ -145,104 +134,115 @@ absl::StatusOr<std::optional<I2CDDCControl>> I2CDDCControl::Probe(
             link.status().code(),
             absl::StrCat(output, " ddc: ", link.status().message()));
       if (*link) {
-        const size_t slash = (*link)->rfind('/');
-        if (slash == (*link)->npos) {
-          devs.emplace_front(std::move(link_path), **std::move(link));
-        } else {
-          devs.emplace_front(std::move(link_path),
-                             absl::string_view(**link).substr(slash + 1));
-        }
+        absl::string_view device = **link;
+        if (const size_t slash = device.rfind('/'); slash != device.npos) device = device.substr(slash + 1);
+        if (auto dev = ProbeDevice(output, device); !dev.ok() || *dev) return dev;
       }
     }
     if (absl::StartsWith(ent->d_name, "i2c-")) {
-      devs.emplace_back(absl::StrCat(output_dir, "/", ent->d_name),
-                        ent->d_name);
+      devs.emplace_back(ent->d_name);
     }
   }
-  if (devs.empty()) {
-    std::unique_ptr<DIR, Deleter<closedir>> card_device_dirp;
-    while (true) {
-      card_device_dirp.reset(
-          opendir(absl::StrCat(output_dir, "/device/device").c_str()));
-      if (!card_device_dirp && errno == EINTR) continue;
-      if (!card_device_dirp)
-        return absl::ErrnoToStatus(
-            errno, absl::StrCat("opendir failed for card for ", output));
-      break;
-    }
-    while (true) {
-      errno = 0;
-      const struct dirent *const ent = readdir(card_device_dirp.get());
-      if (!ent && errno == EINTR) continue;
-      if (!ent && errno)
-        return absl::ErrnoToStatus(errno,
-                                   absl::StrCat("readdir failed for ", output));
-      if (!ent) break;
-      if (ent->d_type != DT_DIR) continue;
-      if (!absl::StartsWith(ent->d_name, "i2c-")) continue;
-      auto name_fd = Open(
-          absl::StrCat(output_dir, "/device/device/", ent->d_name, "/name"),
-          O_RDONLY);
-      if (!name_fd.ok()) continue;
-      auto name = ReadStr(name_fd->get(), 64);
-      if (!name.ok()) continue;
-      if (absl::StripAsciiWhitespace(*name) != "DPMST") continue;
-      devs.emplace_back(
-          absl::StrCat(output_dir, "/device/device/", ent->d_name),
-          ent->d_name);
-    }
+  for (const std::string &device : devs)
+    if (auto dev = ProbeDevice(output, device); !dev.ok() || *dev) return dev;
+  // DP MST DDC buses aren't populated under ${output}, so we have to look
+  // through ${card}/i2c-*.  sysfs doesn't tell us which one is which output,
+  // so we read the EDID and compare.
+  const auto edid_fd = Open(absl::StrCat(output_dir, "/edid"), O_RDONLY);
+  if (!edid_fd.ok())
+    return absl::Status(
+        edid_fd.status().code(),
+        absl::StrCat(output, " could not read EDID from sysfs: ",
+                     edid_fd.status().message()));
+  const auto sysfs_edid = ReadStr(edid_fd->get(), 128);
+  if (!sysfs_edid.ok())
+    return absl::Status(
+        sysfs_edid.status().code(),
+        absl::StrCat(output, " could not read EDID from sysfs: ",
+                     sysfs_edid.status().message()));
+  std::unique_ptr<DIR, Deleter<closedir>> card_device_dirp;
+  while (true) {
+    card_device_dirp.reset(
+        opendir(absl::StrCat(output_dir, "/device/device").c_str()));
+    if (!card_device_dirp && errno == EINTR) continue;
+    if (!card_device_dirp)
+      return absl::ErrnoToStatus(
+          errno, absl::StrCat("opendir failed for card for ", output));
+    break;
   }
-  for (auto &devp : devs) {
-    const auto dev_nums_fd = Open(
-        absl::StrCat(devp.first, "/i2c-dev/", devp.second, "/dev"), O_RDONLY);
-    if (!dev_nums_fd.ok())
-      return absl::Status(
-          dev_nums_fd.status().code(),
-          absl::StrCat(output, " ", devp.second,
-                       " could not read device number from sysfs: ",
-                       dev_nums_fd.status().message()));
-    const auto sysfs_dev_nums = ReadDev(dev_nums_fd->get());
-    if (!sysfs_dev_nums.ok())
-      return absl::Status(
-          sysfs_dev_nums.status().code(),
-          absl::StrCat(output, " ", devp.second,
-                       " could not read device number from sysfs: ",
-                       sysfs_dev_nums.status().message()));
-    auto dev_fd = Open(absl::StrCat("/dev/", devp.second), O_RDWR);
-    const auto devfs_dev_nums = StatDev(dev_fd->get());
-    if (!devfs_dev_nums.ok())
-      return absl::Status(
-          devfs_dev_nums.status().code(),
-          absl::StrCat(output, " ", devp.second,
-                       " could not read device number from sysfs: ",
-                       devfs_dev_nums.status().message()));
-    if (*sysfs_dev_nums != *devfs_dev_nums)
-      return absl::InternalError(absl::StrCat(
-          "/dev/", devp.second, " device number ", major(*devfs_dev_nums), ":",
-          minor(*devfs_dev_nums), " doesn't match sysfs ",
-          major(*sysfs_dev_nums), ":", minor(*sysfs_dev_nums)));
+  while (true) {
+    errno = 0;
+    const struct dirent *const ent = readdir(card_device_dirp.get());
+    if (!ent && errno == EINTR) continue;
+    if (!ent && errno)
+      return absl::ErrnoToStatus(errno,
+                                 absl::StrCat("readdir failed for ", output));
+    if (!ent) return std::nullopt;
+    if (ent->d_type != DT_DIR) continue;
+    if (!absl::StartsWith(ent->d_name, "i2c-")) continue;
+    auto name_fd = Open(
+        absl::StrCat(output_dir, "/device/device/", ent->d_name, "/name"),
+        O_RDONLY);
+    if (!name_fd.ok()) continue;
+    auto name = ReadStr(name_fd->get(), 64);
+    if (!name.ok()) continue;
+    if (absl::StripAsciiWhitespace(*name) != "DPMST") continue;
+    if (auto dev = ProbeDevice(output, ent->d_name, *sysfs_edid); !dev.ok() || *dev) return dev;
+  }
+}
+
+absl::StatusOr<std::optional<I2CDDCControl>> I2CDDCControl::ProbeDevice(
+    const absl::string_view output, const absl::string_view device, const absl::string_view match_edid) {
+  const auto dev_nums_fd = Open(
+      absl::StrCat("/sys/bus/i2c/devices/", device, "/i2c-dev/", device, "/dev"), O_RDONLY);
+  if (!dev_nums_fd.ok())
+    return absl::Status(
+        dev_nums_fd.status().code(),
+        absl::StrCat(output, " ", device,
+                     " could not read device number from sysfs: ",
+                     dev_nums_fd.status().message()));
+  const auto sysfs_dev_nums = ReadDev(dev_nums_fd->get());
+  if (!sysfs_dev_nums.ok())
+    return absl::Status(
+        sysfs_dev_nums.status().code(),
+        absl::StrCat(output, " ", device,
+                     " could not read device number from sysfs: ",
+                     sysfs_dev_nums.status().message()));
+  auto dev_fd = Open(absl::StrCat("/dev/", device), O_RDWR);
+  const auto devfs_dev_nums = StatDev(dev_fd->get());
+  if (!devfs_dev_nums.ok())
+    return absl::Status(
+        devfs_dev_nums.status().code(),
+        absl::StrCat(output, " ", device,
+                     " could not read device number from sysfs: ",
+                     devfs_dev_nums.status().message()));
+  if (*sysfs_dev_nums != *devfs_dev_nums)
+    return absl::InternalError(absl::StrCat(
+        "/dev/", device, " device number ", major(*devfs_dev_nums), ":",
+        minor(*devfs_dev_nums), " doesn't match sysfs ",
+        major(*sysfs_dev_nums), ":", minor(*sysfs_dev_nums)));
+  if (!match_edid.empty()) {
     const auto ddc_edid = I2CDDCControl::ReadEDID(dev_fd->get());
     if (!ddc_edid.ok())
       return absl::Status(
           ddc_edid.status().code(),
-          absl::StrCat(output, " ", devp.second,
+          absl::StrCat(output, " ", device,
                        " failed to read EDID: ", ddc_edid.status().message()));
-    if (*sysfs_edid != *ddc_edid) continue;
-    while (true) {
-      const int ret = ioctl(dev_fd->get(), I2C_SLAVE, kDeviceBusAddr);
-      if (ret != 0 && errno == EINTR) continue;
-      if (ret != 0)
-        return absl::ErrnoToStatus(
-            errno, absl::StrCat(output, " ", devp.second,
-                                " failed to set I2C_SLAVE address 0x",
-                                absl::Hex(kDeviceBusAddr)));
-      break;
-    }
-    if (I2CDDCControl ddc(std::move(devp.second), *std::move(dev_fd));
-        ddc.GetBrightnessPercent().ok())
-      return ddc;
+    if (*ddc_edid != match_edid) return std::nullopt;
   }
-  return std::nullopt;
+  while (true) {
+    const int ret = ioctl(dev_fd->get(), I2C_SLAVE, kDeviceBusAddr);
+    if (ret != 0 && errno == EINTR) continue;
+    if (ret != 0)
+      return absl::ErrnoToStatus(
+          errno, absl::StrCat(output, " ", device,
+                              " failed to set I2C_SLAVE address 0x",
+                              absl::Hex(kDeviceBusAddr)));
+    break;
+  }
+  I2CDDCControl ddc(std::string(device), *std::move(dev_fd));
+  if (auto read = ddc.GetBrightnessPercent().status(); !read.ok()) return read;
+  return ddc;
 }
 
 absl::StatusOr<int> I2CDDCControl::GetBrightnessPercentImpl(

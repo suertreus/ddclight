@@ -17,6 +17,8 @@ class BacklightControl : public Control {
  public:
   static absl::StatusOr<std::optional<BacklightControl>> Probe(
       absl::string_view output, absl::string_view output_dir);
+  static absl::StatusOr<std::optional<BacklightControl>> ProbeDevice(
+      absl::string_view output, absl::string_view device);
   BacklightControl(BacklightControl &&) = default;
   BacklightControl &operator=(BacklightControl &&) = default;
   ~BacklightControl() override = default;
