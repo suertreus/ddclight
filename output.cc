@@ -49,6 +49,7 @@ Output::~Output() {
 }
 
 void Output::ThreadLoop(Output *that) {
+  constexpr auto kRetryInterval = absl::Minutes(1);
   int last_desired_percentage;
   {
     absl::MutexLock l(&that->state_->lock);
@@ -68,7 +69,7 @@ void Output::ThreadLoop(Output *that) {
         [that] { return that->cancel_.load(std::memory_order_relaxed); });
     absl::MutexLock l(&that->state_->lock);
     if (ss.ok()) {
-      if (that->WaitForNewTargetOrCancel(absl::Minutes(1))) return;
+      if (that->WaitForNewTargetOrCancel(kRetryInterval)) return;
       last_desired_percentage = that->state_->desired_percentage.value_or(50);
     } else {
 #ifndef NDEBUG
@@ -77,9 +78,9 @@ void Output::ThreadLoop(Output *that) {
                     "%s\nWill retry in %v.\n",
                     last_desired_percentage, that->name_, that->make_,
                     that->model_, that->control_->name(), ss.ToString(),
-                    absl::Minutes(1));
+                    absl::FormatDuration(kRetryInterval));
 #endif
-      if (that->WaitForDurationOrCancel(absl::Minutes(1))) return;
+      if (that->WaitForDurationOrCancel(kRetryInterval)) return;
     }
   }
 }
@@ -99,7 +100,7 @@ bool Output::WaitForNewTargetOrCancel(absl::Duration d) {
                   "Failed to get brightness on output %s (%s:%s) %s: %s\nWill "
                   "retry in %v.\n",
                   name_, make_, model_, control_->name(),
-                  current_percent.status().ToString(), d);
+                  current_percent.status().ToString(), absl::FormatDuration(d));
 #endif
     return WaitForDurationOrCancel(d);
   }
