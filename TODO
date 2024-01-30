@@ -11,5 +11,7 @@ Per-make/model configuration
 Push/pop support in protocol
 libappindicator support?
 Do enumeration on multiple threads to startup faster
-  Avoid reading EDID from non-MST I2Cs
-  Cache	EDID reads from	I2C to avoid re-reads when searching for multiple MSTs
+  Cache EDID reads from I2C to avoid re-reads when searching for multiple MSTs
+https://emersion.pages.freedesktop.org/libdisplay-info/ to decode EDIDs?
+Make sure i2c-dev module is loaded, if appropriate
+Create a udev rule to share rw perms to i2c devnodes with local user

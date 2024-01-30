@@ -215,6 +215,10 @@ absl::StatusOr<std::optional<I2CDDCControl>> I2CDDCControl::ProbeDevice(
                      " could not read device number from sysfs: ",
                      sysfs_dev_nums.status().message()));
   auto dev_fd = Open(absl::StrCat("/dev/", device), O_RDWR);
+  if (!dev_fd.ok())
+    return absl::Status(dev_fd.status().code(),
+                        absl::StrCat(output, " could not open device node /dev",
+                                     device, ": ", dev_fd.status().message()));
   const auto devfs_dev_nums = StatDev(dev_fd->get());
   if (!devfs_dev_nums.ok())
     return absl::Status(
