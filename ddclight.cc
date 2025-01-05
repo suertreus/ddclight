@@ -3,11 +3,13 @@
 #include <absl/strings/str_format.h>
 #include <absl/strings/string_view.h>
 #include <sdbus-c++/IConnection.h>
+#include <sdbus-c++/Types.h>
 
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <memory>
+#include <string>
 
 #include "client.h"
 #include "server.h"
@@ -16,7 +18,8 @@ int main(int argc, char** argv) {
   if (argc == 2 && argv && argv[1] && absl::string_view(argv[1]) == "get") {
     auto connection = sdbus::createSessionBusConnection();
     absl::PrintF("%d ddclight\n",
-                 jjaro::DDCLightProxy(*connection, sdbus::ServiceName("org.jjaro.ddclight"),
+                 jjaro::DDCLightProxy(*connection,
+                                      sdbus::ServiceName("org.jjaro.ddclight"),
                                       sdbus::ObjectPath("/org/jjaro/ddclight"))
                      .get());
     return EXIT_SUCCESS;
@@ -24,7 +27,8 @@ int main(int argc, char** argv) {
              absl::string_view(argv[1]) == "poke") {
     auto connection = sdbus::createSessionBusConnection();
     absl::PrintF("%d ddclight\n",
-                 jjaro::DDCLightProxy(*connection, sdbus::ServiceName("org.jjaro.ddclight"),
+                 jjaro::DDCLightProxy(*connection,
+                                      sdbus::ServiceName("org.jjaro.ddclight"),
                                       sdbus::ObjectPath("/org/jjaro/ddclight"))
                      .poke());
     return EXIT_SUCCESS;
@@ -34,8 +38,9 @@ int main(int argc, char** argv) {
     if (argv[2] && absl::SimpleAtoi(argv[2], &arg)) {
       auto connection = sdbus::createSessionBusConnection();
       absl::PrintF("%d ddclight\n",
-                 jjaro::DDCLightProxy(*connection, sdbus::ServiceName("org.jjaro.ddclight"),
-                                      sdbus::ObjectPath("/org/jjaro/ddclight"))
+                   jjaro::DDCLightProxy(
+                       *connection, sdbus::ServiceName("org.jjaro.ddclight"),
+                       sdbus::ObjectPath("/org/jjaro/ddclight"))
                        .set(arg));
       return EXIT_SUCCESS;
     }
@@ -45,8 +50,9 @@ int main(int argc, char** argv) {
     if (argv[2] && absl::SimpleAtoi(argv[2], &arg)) {
       auto connection = sdbus::createSessionBusConnection();
       absl::PrintF("%d ddclight\n",
-                 jjaro::DDCLightProxy(*connection, sdbus::ServiceName("org.jjaro.ddclight"),
-                                      sdbus::ObjectPath("/org/jjaro/ddclight"))
+                   jjaro::DDCLightProxy(
+                       *connection, sdbus::ServiceName("org.jjaro.ddclight"),
+                       sdbus::ObjectPath("/org/jjaro/ddclight"))
                        .increment(arg));
       return EXIT_SUCCESS;
     }
@@ -56,8 +62,9 @@ int main(int argc, char** argv) {
     if (argv[2] && absl::SimpleAtoi(argv[2], &arg)) {
       auto connection = sdbus::createSessionBusConnection();
       absl::PrintF("%d ddclight\n",
-                 jjaro::DDCLightProxy(*connection, sdbus::ServiceName("org.jjaro.ddclight"),
-                                      sdbus::ObjectPath("/org/jjaro/ddclight"))
+                   jjaro::DDCLightProxy(
+                       *connection, sdbus::ServiceName("org.jjaro.ddclight"),
+                       sdbus::ObjectPath("/org/jjaro/ddclight"))
                        .decrement(arg));
       return EXIT_SUCCESS;
     }
@@ -73,7 +80,8 @@ int main(int argc, char** argv) {
     (void)setvbuf(stdout, nullptr, _IOLBF, 0);
     auto connection = sdbus::createSessionBusConnection();
     jjaro::DDCLightProxy client(
-        *connection, sdbus::ServiceName("org.jjaro.ddclight"), sdbus::ObjectPath("/org/jjaro/ddclight"),
+        *connection, sdbus::ServiceName("org.jjaro.ddclight"),
+        sdbus::ObjectPath("/org/jjaro/ddclight"),
         [](int64_t percentage) { absl::PrintF("%d\n", percentage); });
     absl::PrintF("%d\n", client.get());
     connection->enterEventLoop();

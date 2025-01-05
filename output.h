@@ -38,10 +38,13 @@ class Output {
   bool WaitForNewTargetOrCancel(absl::Duration d);
   bool WaitForDurationOrCancel(absl::Duration d);
 
-  static constexpr struct wl_output_listener kOutputListener {
-    .geometry = HandleGeometry, .mode = HandleMode, .done = HandleDone,
-    .scale = HandleScale, .name = HandleName, .description = HandleDescription
-  };
+  static constexpr struct wl_output_listener kOutputListener{
+      .geometry = HandleGeometry,
+      .mode = HandleMode,
+      .done = HandleDone,
+      .scale = HandleScale,
+      .name = HandleName,
+      .description = HandleDescription};
   uint32_t wayland_name_;
   std::unique_ptr<struct wl_output, Deleter<wl_output_destroy>> output_;
   std::string make_, model_, name_;

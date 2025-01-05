@@ -7,6 +7,7 @@
 
 #include <cstdio>
 #include <memory>
+#include <string>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -51,8 +52,7 @@ Enumerator::~Enumerator() {
 }
 
 void Enumerator::WaylandThreadLoop(struct wl_display *display) {
-  while (wl_display_dispatch(display) != -1)
-    ;
+  while (wl_display_dispatch(display) != -1);
 }
 void Enumerator::HandleGlobal(void *enumerator, struct wl_registry *,
                               uint32_t name, const char *interface,

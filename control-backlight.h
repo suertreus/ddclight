@@ -1,7 +1,5 @@
 #ifndef JJARO_CONTROL_BACKLIGHT_H_
 #define JJARO_CONTROL_BACKLIGHT_H_ 1
-#include <absl/functional/function_ref.h>
-#include <absl/status/status.h>
 #include <absl/status/statusor.h>
 #include <absl/strings/string_view.h>
 

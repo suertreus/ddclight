@@ -3,6 +3,7 @@
 #include <absl/status/status.h>
 #include <absl/status/statusor.h>
 #include <fcntl.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #include <cerrno>

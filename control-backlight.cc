@@ -10,6 +10,7 @@
 #include <absl/strings/string_view.h>
 #include <dirent.h>
 #include <fcntl.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #include <array>

@@ -5,10 +5,10 @@
 #include <absl/synchronization/mutex.h>
 #include <sdbus-c++/AdaptorInterfaces.h>
 #include <sdbus-c++/IConnection.h>
+#include <sdbus-c++/Types.h>
 
 #include <cstdint>
 #include <list>
-#include <string>
 
 #include "ddclight-server-glue.h"
 #include "enumerate.h"

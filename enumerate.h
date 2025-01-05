@@ -30,9 +30,8 @@ class Enumerator {
   static void HandleGlobalRemove(void *enumerator, struct wl_registry *,
                                  uint32_t name);
 
-  static constexpr struct wl_registry_listener kRegistryListener {
-    .global = HandleGlobal, .global_remove = HandleGlobalRemove
-  };
+  static constexpr struct wl_registry_listener kRegistryListener{
+      .global = HandleGlobal, .global_remove = HandleGlobalRemove};
   absl::AnyInvocable<void(uint32_t name, uint32_t version)> add_output_;
   absl::AnyInvocable<void(uint32_t name)> remove_output_;
   std::unique_ptr<struct wl_display, Deleter<wl_display_disconnect>> display_;
