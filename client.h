@@ -15,8 +15,8 @@ class DDCLightProxy final
     : public sdbus::ProxyInterfaces<org::jjaro::DDCLight_proxy> {
  public:
   DDCLightProxy(
-      sdbus::IConnection& connection, std::string destination,
-      std::string objectPath,
+      sdbus::IConnection& connection, sdbus::ServiceName destination,
+      sdbus::ObjectPath objectPath,
       absl::AnyInvocable<void(int64_t)> watch = [](int64_t) {})
       : ProxyInterfaces(connection, std::move(destination),
                         std::move(objectPath)),

@@ -20,7 +20,7 @@ namespace jjaro {
 class DDCLight final
     : public sdbus::AdaptorInterfaces<org::jjaro::DDCLight_adaptor> {
  public:
-  DDCLight(sdbus::IConnection& connection, std::string objectPath);
+  DDCLight(sdbus::IConnection& connection, sdbus::ObjectPath objectPath);
   ~DDCLight();
 
  private:

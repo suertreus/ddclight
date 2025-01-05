@@ -14,7 +14,7 @@
 
 namespace jjaro {
 
-DDCLight::DDCLight(sdbus::IConnection& connection, std::string objectPath)
+DDCLight::DDCLight(sdbus::IConnection& connection, sdbus::ObjectPath objectPath)
     : AdaptorInterfaces(connection, std::move(objectPath)),
       enumerator_(
           [this](uint32_t name, uint32_t version) { AddOutput(name, version); },

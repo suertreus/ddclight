@@ -10,6 +10,7 @@ Per-make/model configuration
   Manually assign controls
 Push/pop support in protocol
 libappindicator support?
+  https://wiki.ubuntu.com/DesktopExperienceTeam/ApplicationIndicators#CA-a968d95e7e52a76b7614c6cea6d387c979ace2b1_9
 Do enumeration on multiple threads to startup faster
   Cache EDID reads from I2C to avoid re-reads when searching for multiple MSTs
 https://emersion.pages.freedesktop.org/libdisplay-info/ to decode EDIDs?
